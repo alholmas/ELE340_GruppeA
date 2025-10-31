@@ -131,7 +131,7 @@ class PIDGUI(ttk.Frame):
         ttk.Button(radkn, text="Nullstill graf", command=self._nullstill_graf).pack(side=tk.LEFT, padx=8)
 
         # Info-linje
-        self.info_lbl = ttk.Label(venstre, text="PV: —")
+        self.info_lbl = ttk.Label(venstre, text="Avstand: —")
         self.info_lbl.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(6, 0))
 
         # Matplotlib-figur
@@ -141,7 +141,7 @@ class PIDGUI(ttk.Frame):
         self.akse.set_xlabel("Tid [s]")
         self.akse.set_ylabel("PV (heltall)")
         self.akse.grid(True, alpha=0.25)
-        self.linje_pv, = self.akse.plot([], [], label="PV")
+        self.linje_pv, = self.akse.plot([], [], label="Avstand")
         self.akse.legend()
 
         self.canvas = FigureCanvasTkAgg(figur, master=hoyre)
@@ -161,7 +161,7 @@ class PIDGUI(ttk.Frame):
         # Legg til nye data og oppdater plott
         self.t_data.append(float(tid_s))
         self.pv_data.append(int(pv))
-        self.info_lbl.config(text=f"PV: {int(pv)}")
+        self.info_lbl.config(text=f"Avstand: {int(pv)}")
         self._oppdater_plott()
 
     def registrer_pid_callback(self, funksjon) -> None:
@@ -363,10 +363,38 @@ def main() -> None:
     app = PIDGUI(rot)
     app.pack(fill=tk.BOTH, expand=True)
 
-    # --------- Eksterne handler-funksjoner (I/O) ---------
+    # --------- Logging til fil ---------
+    logg_stopp_event = threading.Event()
+
+    def loggtilfil():
+        # Logg data til fil i bakgrunnstråd
+        with open("logg.txt", "a", buffering=1) as f:  # line-buffered
+            while not logg_stopp_event.is_set():
+                try:
+                    if len(app.t_data) and len(app.pv_data):
+                        tid = app.t_data[-1]
+                        pv = app.pv_data[-1]
+                        f.write(f"{tid:.3f},{pv}\n")
+                except Exception as e:
+                    print(f"Loggfeil: {e}")
+                time.sleep(0.06)  # en linje hver 60 ms
+
+    def start_logg():
+        if not hasattr(app, "_logg_thread") or not app._logg_thread.is_alive():
+            logg_stopp_event.clear()
+            app._logg_thread = threading.Thread(target=loggtilfil, daemon=True)
+            app._logg_thread.start()
+            print("Status: loggtråd startet")
+
+    def stopp_logg():
+        logg_stopp_event.set()
+        if hasattr(app, "_logg_thread") and app._logg_thread.is_alive():
+            app._logg_thread.join(timeout=1.0)
+            print("Status: loggtråd stoppet")
+
+    # --------- Serieport-håndtering ---------
 
     def min_koble_til(portstreng: str) -> bool:
-        # Åpne serieport
         sp_gammel = getattr(app, "serieport", None)
         if sp_gammel is not None and sp_gammel.is_open:
             try:
@@ -384,10 +412,13 @@ def main() -> None:
 
         app.serieport = sp_ny
         print(f"Status: tilkoblet: {portstreng}")
+
+        start_logg()  # start logging når porten åpnes
         return True
 
     def min_koble_fra() -> None:
-        # Lukk serieport
+        stopp_logg()  # stopp logging ved frakobling
+
         sp = getattr(app, "serieport", None)
         if sp is not None:
             try:
@@ -399,7 +430,6 @@ def main() -> None:
         print("Status: koblet fra")
 
     def min_pid_handler(settpunkt: int, kp: int, ki: int, kd: int) -> None:
-        # Send PID-verdier til mikrocontroller
         if not app._tilkoblet:
             print("Status: ikke tilkoblet – sender ikke PID")
             return
@@ -407,9 +437,7 @@ def main() -> None:
         if sp is None or not sp.is_open:
             print("Status: serieport ikke tilgjengelig/åpen – sender ikke PID")
             return
-
         try:
-            # Legg header (69) i MSB av settpunkt
             header = 69
             sp_encoded = ((header & 0xFF) << 24) | (int(settpunkt) & 0xFFFFFF)
             pkt = struct.pack("<iiii", sp_encoded, int(kp), int(ki), int(kd))
@@ -419,18 +447,19 @@ def main() -> None:
         except Exception as e:
             messagebox.showerror("Sendefeil", f"Kunne ikke sende PID-verdier: {e}")
 
-
     # Registrer handlers
     app.registrer_tilkoblingshandler(min_koble_til, min_koble_fra)
     app.registrer_pid_callback(min_pid_handler)
 
-    # Vindu-lukk
+    # Lukking av vindu
     def on_close():
+        stopp_logg()
         app.lukk()
         rot.destroy()
 
     rot.protocol("WM_DELETE_WINDOW", on_close)
     rot.mainloop()
+
 
 
 if __name__ == "__main__":
