@@ -10,7 +10,6 @@ import serial.tools.list_ports
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-
 class PIDGUI(ttk.Frame):
     def __init__(self, master: tk.Tk):
         super().__init__(master)
@@ -52,7 +51,6 @@ class PIDGUI(ttk.Frame):
         # Fyll porter nå, ved dropdown, og periodisk
         self._oppdater_porter()
         self.port_cb.bind("<<ComboboxDropdown>>", lambda e: self._oppdater_porter())
-        self.after(5000, self._periodisk_portscan)
 
         # Periodisk synk av GUI
         self.after(1000, self._periodisk_statussynk)
@@ -160,23 +158,23 @@ class PIDGUI(ttk.Frame):
     # ---------- Offentlige metoder ----------
 
     def oppdater_data(self, tid_s: float, pv: int) -> None:
-        """Legg til nye data (heltall PV) og oppdater plott."""
+        # Legg til nye data og oppdater plott
         self.t_data.append(float(tid_s))
         self.pv_data.append(int(pv))
         self.info_lbl.config(text=f"PV: {int(pv)}")
         self._oppdater_plott()
 
     def registrer_pid_callback(self, funksjon) -> None:
-        """Registrer callback for PID-verdier."""
+        # Registrer callback for PID-oppdatering
         self._pid_callback = funksjon
 
     def registrer_tilkoblingshandler(self, koble_til_fn, koble_fra_fn) -> None:
-        """Registrer callbacks for tilkobling/frakobling."""
+        # Registrer callbacks for tilkobling/frakobling
         self._koble_til_fn = koble_til_fn
         self._koble_fra_fn = koble_fra_fn
 
     def sett_pid(self, kp: int, ki: int, kd: int, settpunkt: int | None = None) -> None:
-        """Oppdater PID-verdier i GUI (heltall)."""
+        # Sett PID-verdier i GUI (heltall)
         if settpunkt is not None:
             self.settpunkt_var.set(int(settpunkt))
         self.kp_var.set(int(kp))
@@ -184,13 +182,13 @@ class PIDGUI(ttk.Frame):
         self.kd_var.set(int(kd))
 
     def set_port_list(self, porter: list[str]) -> None:
-        """Fyll combobox med gitt liste over porter."""
+        # Sett liste over porter i dropdown
         self.port_cb["values"] = list(porter) if porter else []
 
     # ---------- Hjelpe-metoder ----------
 
     def _bruk_pid(self) -> None:
-        """Hent heltallsverdier og kall registrert PID-callback."""
+        # Hent PID-verdier og kall callback
         try:
             settpunkt = int(self.settpunkt_var.get())
             kp = int(self.kp_var.get())
@@ -210,14 +208,14 @@ class PIDGUI(ttk.Frame):
             messagebox.showerror("Callback-feil", str(e))
 
     def _nullstill_graf(self) -> None:
-        """Tøm data og oppdater plott."""
+        # Nullstill plottdata
         self.t_data.clear()
         self.pv_data.clear()
         self.info_lbl.config(text="PV: —")
         self._oppdater_plott()
 
     def _oppdater_plott(self) -> None:
-        """Oppdater plott med nåværende data (PV som heltall)."""
+        # Oppdater plott med ny data
         self.linje_pv.set_data(self.t_data, self.pv_data)
         if len(self.t_data) >= 2:
             xmin, xmax = self.t_data[0], self.t_data[-1]
@@ -235,7 +233,7 @@ class PIDGUI(ttk.Frame):
         self.canvas.draw_idle()
 
     def _oppdater_porter(self) -> None:
-        """Oppdater liste over tilgjengelige serieporter."""
+        # Oppdater liste over tilgjengelige porter
         try:
             porter = [p.device for p in serial.tools.list_ports.comports()]
         except Exception as e:
@@ -251,13 +249,8 @@ class PIDGUI(ttk.Frame):
         else:
             self.port_var.set("")
 
-    def _periodisk_portscan(self) -> None:
-        """Periodisk oppdatering av portliste."""
-        self._oppdater_porter()
-        self.after(5000, self._periodisk_portscan)
-
     def _toggle_tilkobling(self) -> None:
-        """Koble til eller fra serieport."""
+        # Koble til eller fra serieport
         if not self._tilkoblet:
             port = self.port_var.get().strip()
             if not port:
@@ -290,7 +283,7 @@ class PIDGUI(ttk.Frame):
         self._oppdater_tilkoblings_ui()
 
     def _oppdater_tilkoblings_ui(self) -> None:
-        """Oppdater UI-elementer basert på tilkoblingsstatus."""
+        # Oppdater UI basert på tilkoblingsstatus
         sp = getattr(self, "serieport", None)
         faktisk_apen = bool(sp and sp.is_open)
         self._tilkoblet = faktisk_apen
@@ -304,14 +297,14 @@ class PIDGUI(ttk.Frame):
             self.status_lbl.config(text="Status: frakoblet")
 
     def _periodisk_statussynk(self) -> None:
-        """Periodisk synk av tilkoblingsstatus."""
+        # Periodisk oppdatering av tilkoblingsstatus
         self._oppdater_tilkoblings_ui()
         self.after(1000, self._periodisk_statussynk)
 
     # --------- Serieport lesetråd ----------
 
     def _start_logging(self) -> None:
-        """Start kommunikasjon i bakgrunnstråd."""
+        # Start bakgrunnstråd for lesing
         if self._lesetraad and self._lesetraad.is_alive():
             return
         self._lesetraads_stop.clear()
@@ -320,14 +313,14 @@ class PIDGUI(ttk.Frame):
         self._lesetraad.start()
 
     def _stopp_logging(self) -> None:
-        """Stopp bakgrunnstråd."""
+        # Stopp bakgrunnstråd for lesing
         self._lesetraads_stop.set()
         if self._lesetraad and self._lesetraad.is_alive():
             self._lesetraad.join(timeout=1.0)
         self._lesetraad = None
 
     def _les_loop(self) -> None:
-        """Les data fra serieport i egen tråd og legg i kø for GUI."""
+        # Les data fra serieport i bakgrunnstråd
         sp = getattr(self, "serieport", None)
         if sp is None or not sp.is_open:
             return
@@ -344,7 +337,7 @@ class PIDGUI(ttk.Frame):
                 break
 
     def _tøm_kø_og_oppdater(self) -> None:
-        """Tøm køen for nye data og oppdater plott."""
+        # Tøm kø for mottatte data og oppdater plott
         try:
             while True:
                 tid_s, pv = self._lesetraads_kø.get_nowait()
@@ -354,7 +347,7 @@ class PIDGUI(ttk.Frame):
         self.after(50, self._tøm_kø_og_oppdater)
 
     def lukk(self) -> None:
-        """Steng serieport og tråder ved lukking."""
+        # Lukk GUI og ressurser
         self._stopp_logging()
         sp = getattr(self, "serieport", None)
         if sp is not None:
@@ -373,7 +366,7 @@ def main() -> None:
     # --------- Eksterne handler-funksjoner (I/O) ---------
 
     def min_koble_til(portstreng: str) -> bool:
-        """Åpne serieport og lagre referanse i app."""
+        # Åpne serieport
         sp_gammel = getattr(app, "serieport", None)
         if sp_gammel is not None and sp_gammel.is_open:
             try:
@@ -394,7 +387,7 @@ def main() -> None:
         return True
 
     def min_koble_fra() -> None:
-        """Lukk serieport."""
+        # Lukk serieport
         sp = getattr(app, "serieport", None)
         if sp is not None:
             try:
@@ -406,7 +399,7 @@ def main() -> None:
         print("Status: koblet fra")
 
     def min_pid_handler(settpunkt: int, kp: int, ki: int, kd: int) -> None:
-        """Send PID-verdier som 4×int32 little-endian (SP, Kp, Ki, Kd)."""
+        # Send PID-verdier til mikrocontroller
         if not app._tilkoblet:
             print("Status: ikke tilkoblet – sender ikke PID")
             return
