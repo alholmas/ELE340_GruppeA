@@ -1,0 +1,19 @@
+{
+    "configurations": [ 
+        {
+            "name": "DEUBUG",
+            "type": "stlinkgdbtarget",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "preBuild": "${command:st-stm32-ide-debug-launch.build}",
+            "runEntry": "main",
+            "liveWatch": { "enabled": true, "samplesPerSecond": "4" },
+            "imagesAndSymbols": [
+                {
+                    "imageFileName": "${workspaceFolder}/build/Debug/sensor_styrenode.elf"
+                }
+            ],
+            "verbose": false
+        }
+    ]
+}
