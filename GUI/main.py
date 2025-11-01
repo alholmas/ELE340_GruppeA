@@ -3,7 +3,7 @@ import serial
 from pid_gui import PIDGUI  # importerer GUI-klassen
 
 
-def main() -> None:
+def main():
     rot = tk.Tk()
     app = PIDGUI(rot)
     app.pack(fill=tk.BOTH, expand=True)
@@ -32,7 +32,7 @@ def main() -> None:
         print(f"Status: tilkoblet: {portstreng}")
         return True
 
-    def min_koble_fra() -> None:
+    def min_koble_fra():
         sp = getattr(app, "serieport", None)
         if sp is not None:
             try:
@@ -43,7 +43,7 @@ def main() -> None:
         app.serieport = None
         print("Status: koblet fra")
 
-    def min_pid_handler(settpunkt: int, kp: int, ki: int, kd: int) -> None:
+    def min_pid_handler(settpunkt: int, kp: int, ki: int, kd: int):
         # Sjekk tilkoblingsstatus før sending
         if not app._tilkoblet:
             print("Status: ikke tilkoblet – sender ikke PID")

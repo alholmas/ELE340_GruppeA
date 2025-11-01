@@ -64,7 +64,7 @@ class PIDGUI(ttk.Frame):
 
     # ---------- Tema / layout ----------
 
-    def _sett_tema(self) -> None:
+    def _sett_tema(self):
         style = ttk.Style()
         try:
             style.theme_use("clam")
@@ -83,7 +83,7 @@ class PIDGUI(ttk.Frame):
     def _ramme(self, parent, tittel: str | None = None):
         return ttk.LabelFrame(parent, text=tittel) if tittel else ttk.Frame(parent)
 
-    def _bygg_layout(self) -> None:
+    def _bygg_layout(self):
         venstre = self._ramme(self.master)
         venstre.pack(side=tk.LEFT, fill=tk.Y, padx=(12, 8), pady=12)
 
@@ -148,7 +148,7 @@ class PIDGUI(ttk.Frame):
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-    def _rad_med_entry(self, parent, etikett: str, var: tk.Variable) -> None:
+    def _rad_med_entry(self, parent, etikett: str, var: tk.Variable):
         rad = ttk.Frame(parent)
         rad.pack(fill=tk.X, padx=8, pady=4)
         ttk.Label(rad, text=etikett).pack(side=tk.LEFT)
@@ -170,14 +170,14 @@ class PIDGUI(ttk.Frame):
 
     # ---------- Offentlig API ----------
 
-    def registrer_pid_callback(self, funksjon) -> None:
+    def registrer_pid_callback(self, funksjon):
         self._pid_callback = funksjon
 
-    def registrer_tilkoblingshandler(self, koble_til_fn, koble_fra_fn) -> None:
+    def registrer_tilkoblingshandler(self, koble_til_fn, koble_fra_fn):
         self._koble_til_fn = koble_til_fn
         self._koble_fra_fn = koble_fra_fn
 
-    def sett_pid(self, kp: int, ki: int, kd: int, settpunkt: int | None = None) -> None:
+    def sett_pid(self, kp: int, ki: int, kd: int, settpunkt: int | None = None):
         if settpunkt is not None:
             self.settpunkt_var.set(str(int(settpunkt)))
         self.kp_var.set(str(int(kp)))
@@ -186,7 +186,7 @@ class PIDGUI(ttk.Frame):
 
     # ---------- Hovedhandlinger ----------
 
-    def _bruk_pid(self) -> None:
+    def _bruk_pid(self):
         # Hent PID-verdier og kall callback (robust parsing)
         sp = self._parse_int(self.settpunkt_var.get())
         kp = self._parse_int(self.kp_var.get())
@@ -206,19 +206,19 @@ class PIDGUI(ttk.Frame):
         except Exception as e:
             messagebox.showerror("Callback-feil", str(e))
 
-    def _nullstill_graf(self) -> None:
+    def _nullstill_graf(self):
         self.t_data.clear()
         self.pv_data.clear()
         self._oppdater_plott()
 
-    def oppdater_data(self, tid_s: float, pv: int) -> None:
+    def oppdater_data(self, tid_s: float, pv: int):
         # Legg til nye data og oppdater plott
         self.t_data.append(float(tid_s))
         self.pv_data.append(int(pv))
         self.info_lbl.config(text=f"Avstand: {int(pv)}")
         self._oppdater_plott()
 
-    def _oppdater_plott(self) -> None:
+    def _oppdater_plott(self):
         # Oppdater PV-kurve
         self.linje_pv.set_data(self.t_data, self.pv_data)
 
@@ -251,7 +251,7 @@ class PIDGUI(ttk.Frame):
 
     # ---------- Tilkobling / port / tråd ----------
 
-    def _oppdater_porter(self) -> None:
+    def _oppdater_porter(self):
         try:
             porter = [p.device for p in serial.tools.list_ports.comports()]
         except Exception as e:
@@ -266,7 +266,7 @@ class PIDGUI(ttk.Frame):
         else:
             self.port_var.set("")
 
-    def _toggle_tilkobling(self) -> None:
+    def _toggle_tilkobling(self):
         if not self._tilkoblet:
             port = self.port_var.get().strip()
             if not port:
@@ -310,7 +310,7 @@ class PIDGUI(ttk.Frame):
 
     # ---------- Logging og lesetråd ----------
 
-    def _start_logging(self) -> None:
+    def _start_logging(self):
         if self._lesetraad and self._lesetraad.is_alive():
             return
         try:
@@ -326,7 +326,7 @@ class PIDGUI(ttk.Frame):
         self._lesetraad = threading.Thread(target=self._les_loop, name="les_serie", daemon=True)
         self._lesetraad.start()
 
-    def _stopp_logging(self) -> None:
+    def _stopp_logging(self):
         self._lesetraads_stop.set()
         if self._lesetraad and self._lesetraad.is_alive():
             self._lesetraad.join(timeout=1.0)
@@ -343,7 +343,7 @@ class PIDGUI(ttk.Frame):
         self.koble_knapp.config(text="Koble til")
         self.status_lbl.config(text="Status: frakoblet")
 
-    def _les_loop(self) -> None:
+    def _les_loop(self):
         sp = getattr(self, "serieport", None)
         if sp is None or not sp.is_open:
             return
@@ -386,7 +386,7 @@ class PIDGUI(ttk.Frame):
                 self.koble_knapp.config(text="Koble til")
                 break
 
-    def _tøm_kø_og_oppdater(self) -> None:
+    def _tøm_kø_og_oppdater(self):
         try:
             while True:
                 tid_s, pv = self._lesetraads_kø.get_nowait()
@@ -395,7 +395,7 @@ class PIDGUI(ttk.Frame):
             pass
         self.after(50, self._tøm_kø_og_oppdater)
 
-    def lukk(self) -> None:
+    def lukk(self):
         self._stopp_logging()
         sp = getattr(self, "serieport", None)
         if sp is not None:
