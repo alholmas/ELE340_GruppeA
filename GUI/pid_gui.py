@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 from collections import deque
 import queue
 import threading
-import struct                     # <-- MÅ være med her
+import struct
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import serial.tools.list_ports
@@ -19,7 +19,7 @@ class PIDGUI(ttk.Frame):
         # Tema
         self._sett_tema()
 
-        # Tilstandsvariabler (StringVar for robust inntasting)
+        # Tilstandsvariabler (lagres som strenger for robust validering)
         self.settpunkt_var = tk.StringVar(value="200")
         self.kp_var = tk.StringVar(value="200")
         self.ki_var = tk.StringVar(value="0")
@@ -34,7 +34,7 @@ class PIDGUI(ttk.Frame):
         self.t_data = deque(maxlen=self.max_punkt)   # tid [s]
         self.pv_data = deque(maxlen=self.max_punkt)  # prosessverdi
 
-        # Eksterne callbacks
+        # Eksterne callbacks (injiseres fra main)
         self._pid_callback = None
         self._koble_til_fn = None
         self._koble_fra_fn = None
@@ -59,8 +59,8 @@ class PIDGUI(ttk.Frame):
         self._oppdater_porter()
         self.port_cb.bind("<<ComboboxDropdown>>", lambda e: self._oppdater_porter())
 
-        # Start periodisk tømming av kø
-        self.after(50, self._tøm_kø_og_oppdater)
+        # Start periodisk tømming av kø (≈ 30 Hz)
+        self.after(33, self._tøm_kø_og_oppdater)
 
     # ---------- Tema / layout ----------
 
@@ -159,7 +159,7 @@ class PIDGUI(ttk.Frame):
 
     @staticmethod
     def _parse_int(s: str):
-        # Robust parsing av heltall fra streng
+        # Parsing av heltall fra streng
         s = (s or "").strip()
         if s in ("", "+", "-"):
             return None
@@ -258,7 +258,7 @@ class PIDGUI(ttk.Frame):
             messagebox.showerror("Portoppdatering feilet", str(e))
             porter = []
         self.port_cb["values"] = porter
-        nåv = self.port_var.get().strip()
+        nåv = (self.port_var.get() or "").strip()
         if nåv and nåv in porter:
             pass
         elif porter:
@@ -268,28 +268,23 @@ class PIDGUI(ttk.Frame):
 
     def _toggle_tilkobling(self):
         if not self._tilkoblet:
-            port = self.port_var.get().strip()
-            if not port:
-                messagebox.showwarning("Port mangler", "Skriv/velg en port før tilkobling.")
-                return
-            if self._koble_til_fn is None:
-                messagebox.showwarning("Mangler handler", "Ingen tilkoblingshandler registrert.")
-                return
+            # --- Koble til ---
             try:
-                resultat = self._koble_til_fn(port)
+                if not callable(self._koble_til_fn):
+                    raise RuntimeError("Tilkoblingshandler ikke satt.")
+                resultat = self._koble_til_fn(self.port_var.get())
                 if resultat is True and getattr(self, "serieport", None) and self.serieport.is_open:
                     self._tilkoblet = True
                     self._start_logging()
                 else:
-                    raise RuntimeError(f"Klarte ikke åpne {port}.")
+                    raise RuntimeError("Klarte ikke koble til.")
             except Exception as e:
                 messagebox.showerror("Tilkoblingsfeil", str(e))
                 self._tilkoblet = False
         else:
+            # --- Koble fra ---
             self._stopp_logging()
-            if self._koble_fra_fn is None:
-                messagebox.showwarning("Mangler handler", "Ingen frakoblingshandler registrert.")
-            else:
+            if callable(self._koble_fra_fn):
                 try:
                     self._koble_fra_fn()
                 except Exception as e:
@@ -302,8 +297,7 @@ class PIDGUI(ttk.Frame):
         self._tilkoblet = faktisk_apen
         if faktisk_apen:
             self.koble_knapp.config(text="Koble fra")
-            portnavn = self.port_var.get().strip() or "<ukjent>"
-            self.status_lbl.config(text=f"Status: tilkoblet ({portnavn})")
+            self.status_lbl.config(text=f"Status: tilkoblet ({self.port_var.get().strip() or '<ukjent>'})")
         else:
             self.koble_knapp.config(text="Koble til")
             self.status_lbl.config(text="Status: frakoblet")
@@ -314,7 +308,7 @@ class PIDGUI(ttk.Frame):
         if self._lesetraad and self._lesetraad.is_alive():
             return
         try:
-            filnavn = self.filnavn_var.get().strip() or "logg.txt"
+            filnavn = (self.filnavn_var.get() or "").strip() or "logg.txt"
             self._logg_fil = open(filnavn, "a", buffering=1, encoding="utf-8")
         except Exception as e:
             messagebox.showerror("Loggfil-feil", f"Kunne ikke åpne loggfil: {e}")
@@ -393,7 +387,7 @@ class PIDGUI(ttk.Frame):
                 self.oppdater_data(tid_s, pv)
         except queue.Empty:
             pass
-        self.after(50, self._tøm_kø_og_oppdater)
+        self.after(33, self._tøm_kø_og_oppdater)
 
     def lukk(self):
         self._stopp_logging()

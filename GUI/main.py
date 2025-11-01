@@ -1,6 +1,6 @@
 import tkinter as tk
 import serial
-from pid_gui import PIDGUI  # importerer GUI-klassen
+from pid_gui import PIDGUI
 
 
 def main():
