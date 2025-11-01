@@ -10,7 +10,7 @@ import serial.tools.list_ports
 
 
 class PIDGUI(ttk.Frame):
-    def __init__(self, master: tk.Tk):
+    def __init__(self, master):
         super().__init__(master)
         self.master.title("PID styring av avstandssensor")
         self.master.geometry("1400x600")
@@ -20,15 +20,15 @@ class PIDGUI(ttk.Frame):
         # Tema
         self._sett_tema()
 
-        # Tilstandsvariabler (lagres som strenger for robust validering)
+        # Tilstandsvariabler
         self.settpunkt_var = tk.StringVar(value="200")
         self.kp_var = tk.StringVar(value="200")
         self.ki_var = tk.StringVar(value="0")
         self.kd_var = tk.StringVar(value="2000")
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
-        self._tilkoblet: bool = False
-        self.serieport = None  # type: serial.Serial | None
+        self._tilkoblet = False
+        self.serieport = None  # serieport-objekt settes av tilkoblingshandler
 
         # Data-buffere for plott
         self.max_punkt = 2000
@@ -41,17 +41,17 @@ class PIDGUI(ttk.Frame):
         self._koble_fra_fn = None
 
         # Tråd og kø for innkommende data
-        self._lesetraads_kø: queue.Queue[tuple[float, int]] = queue.Queue()
+        self._lesetraads_kø = queue.Queue()
         self._lesetraads_stop = threading.Event()
-        self._lesetraad: threading.Thread | None = None
+        self._lesetraad = None
 
         # Loggfilhåndtak
         self._logg_fil = None
 
         # MCU-tidsrekonstruksjon (uint8 teller @ 100 Hz)
-        self._mcu_tid_forrige: int | None = None
-        self._mcu_tick_sum: int = 0
-        self._sample_periode_s: float = 0.01  # 10 ms/pakke
+        self._mcu_tid_forrige = None
+        self._mcu_tick_sum = 0
+        self._sample_periode_s = 0.01  # 10 ms/pakke
 
         # Bygg UI
         self._bygg_layout()
@@ -81,7 +81,7 @@ class PIDGUI(ttk.Frame):
         style.configure("TButton", background="#2f3540", foreground=tekst, padding=6)
         style.map("TButton", background=[("active", "#3a4352")])
 
-    def _ramme(self, parent, tittel: str | None = None):
+    def _ramme(self, parent, tittel=None):
         return ttk.LabelFrame(parent, text=tittel) if tittel else ttk.Frame(parent)
 
     def _bygg_layout(self):
@@ -149,7 +149,7 @@ class PIDGUI(ttk.Frame):
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-    def _rad_med_entry(self, parent, etikett: str, var: tk.Variable):
+    def _rad_med_entry(self, parent, etikett, var):
         rad = ttk.Frame(parent)
         rad.pack(fill=tk.X, padx=8, pady=4)
         ttk.Label(rad, text=etikett).pack(side=tk.LEFT)
@@ -159,7 +159,7 @@ class PIDGUI(ttk.Frame):
     # ---------- Hjelpefunksjoner ----------
 
     @staticmethod
-    def _parse_int(s: str):
+    def _parse_int(s):
         # Parsing av heltall fra streng
         s = (s or "").strip()
         if s in ("", "+", "-"):
@@ -178,7 +178,7 @@ class PIDGUI(ttk.Frame):
         self._koble_til_fn = koble_til_fn
         self._koble_fra_fn = koble_fra_fn
 
-    def sett_pid(self, kp: int, ki: int, kd: int, settpunkt: int | None = None):
+    def sett_pid(self, kp, ki, kd, settpunkt=None):
         if settpunkt is not None:
             self.settpunkt_var.set(str(int(settpunkt)))
         self.kp_var.set(str(int(kp)))
@@ -212,7 +212,7 @@ class PIDGUI(ttk.Frame):
         self.pv_data.clear()
         self._oppdater_plott()
 
-    def oppdater_data(self, tid_s: float, pv: int):
+    def oppdater_data(self, tid_s, pv):
         # Legg til nye data og oppdater plott
         self.t_data.append(float(tid_s))
         self.pv_data.append(int(pv))

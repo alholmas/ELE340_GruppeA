@@ -12,7 +12,7 @@ def main():
 
     # Serieport-tilkoblingshandler
 
-    def min_koble_til(portstreng: str) -> bool:
+    def min_koble_til(portstreng):
         # Lukk gammel port hvis åpen
         sp_gammel = getattr(app, "serieport", None)
         if sp_gammel is not None and sp_gammel.is_open:
@@ -45,7 +45,7 @@ def main():
         app.serieport = None
         print("Status: koblet fra")
 
-    def min_pid_handler(settpunkt: int, kp: int, ki: int, kd: int):
+    def min_pid_handler(settpunkt, kp, ki, kd):
         # Sjekk tilkoblingsstatus før sending
         if not app._tilkoblet:
             print("Status: ikke tilkoblet – sender ikke PID")
