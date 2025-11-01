@@ -15,6 +15,7 @@ class PIDGUI(ttk.Frame):
         self.master.title("PID styring av avstandssensor")
         self.master.geometry("1400x600")
         self.master.minsize(820, 520)
+        self.master.protocol("WM_DELETE_WINDOW", self.lukk)
 
         # Tema
         self._sett_tema()
