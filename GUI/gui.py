@@ -4,11 +4,12 @@ from collections import deque
 import struct
 import threading
 import queue
-import time
 import serial
 import serial.tools.list_ports
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+import typing
+
 
 class PIDGUI(ttk.Frame):
     def __init__(self, master: tk.Tk):
@@ -26,12 +27,13 @@ class PIDGUI(ttk.Frame):
         self.ki_var = tk.IntVar(value=0)
         self.kd_var = tk.IntVar(value=0)
         self.port_var = tk.StringVar(value="")
+        self.filnavn_var = tk.StringVar(value="logg.txt")
         self._tilkoblet: bool = False
         self.serieport = None  # type: serial.Serial | None
 
         # Databuffer for plott (heltall for PV, tid kan være flyt for akse)
         self.max_punkt = 2000
-        self.t_data = deque(maxlen=self.max_punkt)   # tid [s] relativ
+        self.t_data = deque(maxlen=self.max_punkt)   # tid [s] (MCU-relativ)
         self.pv_data = deque(maxlen=self.max_punkt)  # avstand (heltall)
 
         # Callbacks injisert utenfra
@@ -43,7 +45,14 @@ class PIDGUI(ttk.Frame):
         self._lesetraads_kø: queue.Queue[tuple[float, int]] = queue.Queue()
         self._lesetraads_stop = threading.Event()
         self._lesetraad: threading.Thread | None = None
-        self._t0 = None  # starttid for x-akse
+
+        # Loggfilhåndtak (åpnes når lesing starter, lukkes ved stopp)
+        self._logg_fil: typing.TextIO | None = None
+
+        # MCU-tidsrekonstruksjon (uint8 teller @ 100 Hz)
+        self._mcu_tid_forrige: int | None = None   # forrige tidsbyte fra MCU
+        self._mcu_tick_sum: int = 0                # akkumulert antall 10 ms-ticks
+        self._sample_periode_s: float = 0.01       # 10 ms per pakke
 
         # Bygg UI
         self._bygg_layout()
@@ -52,8 +61,7 @@ class PIDGUI(ttk.Frame):
         self._oppdater_porter()
         self.port_cb.bind("<<ComboboxDropdown>>", lambda e: self._oppdater_porter())
 
-        # Periodisk synk av GUI
-        self.after(1000, self._periodisk_statussynk)
+        # Start oppdaterings for mottatte data
         self.after(50, self._tøm_kø_og_oppdater)
 
     # ---------- Tema ----------
@@ -110,7 +118,7 @@ class PIDGUI(ttk.Frame):
         rad_knapp.pack(fill=tk.X, padx=8, pady=(6, 8))
         self.koble_knapp = ttk.Button(rad_knapp, text="Koble til", command=self._toggle_tilkobling)
         self.koble_knapp.pack(side=tk.LEFT)
-
+        self._rad_med_entry(tilk_boks, "Filnavn på logg:", self.filnavn_var)
         self.status_lbl = ttk.Label(venstre, text="Status: frakoblet")
         self.status_lbl.pack(fill=tk.X, padx=4, pady=(6, 10))
 
@@ -155,7 +163,7 @@ class PIDGUI(ttk.Frame):
         ent = ttk.Entry(rad, textvariable=var, width=12)
         ent.pack(side=tk.RIGHT)
 
-    # ---------- Offentlige metoder ----------
+    # ---------- Globale metodar ----------
 
     def oppdater_data(self, tid_s: float, pv: int) -> None:
         # Legg til nye data og oppdater plott
@@ -180,10 +188,6 @@ class PIDGUI(ttk.Frame):
         self.kp_var.set(int(kp))
         self.ki_var.set(int(ki))
         self.kd_var.set(int(kd))
-
-    def set_port_list(self, porter: list[str]) -> None:
-        # Sett liste over porter i dropdown
-        self.port_cb["values"] = list(porter) if porter else []
 
     # ---------- Hjelpe-metoder ----------
 
@@ -211,7 +215,6 @@ class PIDGUI(ttk.Frame):
         # Nullstill plottdata
         self.t_data.clear()
         self.pv_data.clear()
-        self.info_lbl.config(text="PV: —")
         self._oppdater_plott()
 
     def _oppdater_plott(self) -> None:
@@ -279,11 +282,6 @@ class PIDGUI(ttk.Frame):
                 except Exception as e:
                     messagebox.showerror("Frakoblingsfeil", str(e))
             self._tilkoblet = False
-
-        self._oppdater_tilkoblings_ui()
-
-    def _oppdater_tilkoblings_ui(self) -> None:
-        # Oppdater UI basert på tilkoblingsstatus
         sp = getattr(self, "serieport", None)
         faktisk_apen = bool(sp and sp.is_open)
         self._tilkoblet = faktisk_apen
@@ -295,29 +293,46 @@ class PIDGUI(ttk.Frame):
         else:
             self.koble_knapp.config(text="Koble til")
             self.status_lbl.config(text="Status: frakoblet")
+    
 
-    def _periodisk_statussynk(self) -> None:
-        # Periodisk oppdatering av tilkoblingsstatus
-        self._oppdater_tilkoblings_ui()
-        self.after(1000, self._periodisk_statussynk)
-
-    # --------- Serieport lesetråd ----------
+    # --------- Serieport lesetråd + logging pr. pakke ----------
 
     def _start_logging(self) -> None:
-        # Start bakgrunnstråd for lesing
+        # Start bakgrunnstråd for lesing og åpne loggfil linjebufret
         if self._lesetraad and self._lesetraad.is_alive():
             return
+        try:
+            filnavn = self.filnavn_var.get().strip() or "logg.txt"
+            # buffering=1 => linjebufret, encoding for trygg tekst
+            self._logg_fil = open(filnavn, "a", buffering=1, encoding="utf-8")
+        except Exception as e:
+            messagebox.showerror("Loggfil-feil", f"Kunne ikke åpne loggfil: {e}")
+            self._logg_fil = None
+
         self._lesetraads_stop.clear()
-        self._t0 = time.monotonic()
+
+        # VIKTIG: nullstill MCU-tidsrekonstruksjon (start relativ tid fra 0)
+        self._mcu_tid_forrige = None
+        self._mcu_tick_sum = 0
         self._lesetraad = threading.Thread(target=self._les_loop, name="les_serie", daemon=True)
         self._lesetraad.start()
 
     def _stopp_logging(self) -> None:
-        # Stopp bakgrunnstråd for lesing
+        # Stopp bakgrunnstråd for lesing og lukk loggfil
         self._lesetraads_stop.set()
         if self._lesetraad and self._lesetraad.is_alive():
             self._lesetraad.join(timeout=1.0)
         self._lesetraad = None
+
+        if self._logg_fil is not None:
+            try:
+                self._logg_fil.close()
+            except Exception:
+                pass
+            self._logg_fil = None
+        self._tilkoblet = False
+        self.koble_knapp.config(text="Koble til")
+        self.status_lbl.config(text="Status: frakoblet")
 
     def _les_loop(self) -> None:
         # Les data fra serieport i bakgrunnstråd
@@ -329,12 +344,44 @@ class PIDGUI(ttk.Frame):
                 data = sp.read(3)
                 if len(data) != 3:
                     continue
-                tid8, verdi = struct.unpack("<Bh", data)  # tid:uint8, verdi:int16 (LE)
-                tid_s = time.monotonic() - (self._t0 or time.monotonic())
-                self._lesetraads_kø.put((tid_s, int(verdi)))
+
+                # Pakkeformat: <Bh  =>  tid:uint8, verdi:int16 (LE)
+                tid8, verdi = struct.unpack("<Bh", data)
+
+                # MCU-relativ tid (starter på 0 s hver logging), håndter 8-bit wrap
+                if self._mcu_tid_forrige is None:
+                    # Første pakke etter start -> tid = 0.0 s
+                    self._mcu_tid_forrige = tid8
+                    mcu_tid_s = 0.0
+                else:
+                    # Delta med wrap (uint8)
+                    delta_ticks = (tid8 - self._mcu_tid_forrige) & 0xFF
+                    self._mcu_tick_sum += int(delta_ticks)
+                    self._mcu_tid_forrige = tid8
+                    mcu_tid_s = self._mcu_tick_sum * self._sample_periode_s
+
+                # Logg én linje per mottatt pakke – nå med MCU-tid
+                if self._logg_fil is not None:
+                    try:
+                        self._logg_fil.write(f"{mcu_tid_s:.3f},{int(verdi)}\n")
+                    except Exception as le:
+                        self.status_lbl.config(text=f"Loggfeil: {le}")
+
+                # Oppdater GUI via kø med MCU-tid
+                self._lesetraads_kø.put((mcu_tid_s, int(verdi)))
+
             except Exception as e:
                 self.status_lbl.config(text=f"Lesefeil: {e}")
+                try:
+                    if sp and sp.is_open:
+                        sp.close()
+                except Exception:
+                    pass
+                self.serieport = None
+                self._tilkoblet = False
+                self.koble_knapp.config(text="Koble til")
                 break
+
 
     def _tøm_kø_og_oppdater(self) -> None:
         # Tøm kø for mottatte data og oppdater plott
@@ -363,38 +410,9 @@ def main() -> None:
     app = PIDGUI(rot)
     app.pack(fill=tk.BOTH, expand=True)
 
-    # --------- Logging til fil ---------
-    logg_stopp_event = threading.Event()
-
-    def loggtilfil():
-        # Logg data til fil i bakgrunnstråd
-        with open("logg.txt", "a", buffering=1) as f:  # line-buffered
-            while not logg_stopp_event.is_set():
-                try:
-                    if len(app.t_data) and len(app.pv_data):
-                        tid = app.t_data[-1]
-                        pv = app.pv_data[-1]
-                        f.write(f"{tid:.3f},{pv}\n")
-                except Exception as e:
-                    print(f"Loggfeil: {e}")
-                time.sleep(0.06)  # en linje hver 60 ms
-
-    def start_logg():
-        if not hasattr(app, "_logg_thread") or not app._logg_thread.is_alive():
-            logg_stopp_event.clear()
-            app._logg_thread = threading.Thread(target=loggtilfil, daemon=True)
-            app._logg_thread.start()
-            print("Status: loggtråd startet")
-
-    def stopp_logg():
-        logg_stopp_event.set()
-        if hasattr(app, "_logg_thread") and app._logg_thread.is_alive():
-            app._logg_thread.join(timeout=1.0)
-            print("Status: loggtråd stoppet")
-
     # --------- Serieport-håndtering ---------
-
     def min_koble_til(portstreng: str) -> bool:
+        # Åpne serieport
         sp_gammel = getattr(app, "serieport", None)
         if sp_gammel is not None and sp_gammel.is_open:
             try:
@@ -412,13 +430,9 @@ def main() -> None:
 
         app.serieport = sp_ny
         print(f"Status: tilkoblet: {portstreng}")
-
-        start_logg()  # start logging når porten åpnes
         return True
 
     def min_koble_fra() -> None:
-        stopp_logg()  # stopp logging ved frakobling
-
         sp = getattr(app, "serieport", None)
         if sp is not None:
             try:
@@ -430,6 +444,7 @@ def main() -> None:
         print("Status: koblet fra")
 
     def min_pid_handler(settpunkt: int, kp: int, ki: int, kd: int) -> None:
+        # Sjekk tilkoblingsstatus før sending
         if not app._tilkoblet:
             print("Status: ikke tilkoblet – sender ikke PID")
             return
@@ -438,6 +453,7 @@ def main() -> None:
             print("Status: serieport ikke tilgjengelig/åpen – sender ikke PID")
             return
         try:
+            # Header i MSB (69) + 24-bit payload for periode (ms)
             header = 69
             sp_encoded = ((header & 0xFF) << 24) | (int(settpunkt) & 0xFFFFFF)
             pkt = struct.pack("<iiii", sp_encoded, int(kp), int(ki), int(kd))
@@ -453,13 +469,11 @@ def main() -> None:
 
     # Lukking av vindu
     def on_close():
-        stopp_logg()
         app.lukk()
         rot.destroy()
 
     rot.protocol("WM_DELETE_WINDOW", on_close)
     rot.mainloop()
-
 
 
 if __name__ == "__main__":
