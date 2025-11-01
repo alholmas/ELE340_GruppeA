@@ -1,5 +1,7 @@
 import tkinter as tk
+from tkinter import messagebox
 import serial
+import struct
 from pid_gui import PIDGUI
 
 
