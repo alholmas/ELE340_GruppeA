@@ -1,6 +1,7 @@
 #include "adc.h"
-
-
+#include "stm32f303xc.h"
+#include "stm32f3xx_ll_adc.h"
+#include "tim.h"
 
 void ADC3_Init(void)
 {  
@@ -63,28 +64,33 @@ void ADC3_Init(void)
   LL_ADC_SetChannelSingleDiff(ADC3, LL_ADC_CHANNEL_1, LL_ADC_SINGLE_ENDED);  
 }
 
-void ADC3_StartConversion(void)
+void ADC3_StartConversion_TRGO(void)
 {
+  LL_ADC_ClearFlag_EOC(ADC3);
+  // Kalibrering av ADC
   LL_ADC_StartCalibration(ADC3, LL_ADC_SINGLE_ENDED);
   while (LL_ADC_IsCalibrationOnGoing(ADC3)) {
     /* wait calibration */
   }
-  /* Enable End Of Conversion interrupt */
+  // Enable end of conversion interrupt
   LL_ADC_EnableIT_EOC(ADC3);
-  /* Enable ADC */
+  // Enable ADC
   LL_ADC_Enable(ADC3);
-  /* Wait for ADC ready */
   while (!LL_ADC_IsActiveFlag_ADRDY(ADC3)) {
+    /* wait ADC ready */
   }
+  // Start konvertering
   LL_ADC_REG_StartConversion(ADC3);
+  // Start TIM7 for trigging av ADC konvertering
+  
 }
 
-
-void ADC3_StopConversion(void)
+void ADC3_StopConversion_TRGO(void)
 {
   LL_ADC_REG_StopConversion(ADC3);
   LL_ADC_DisableIT_EOC(ADC3);
   LL_ADC_Disable(ADC3);
+  TIM7_Stopp_TRGO();
 } 
 
 // Callback function for end of conversion for bruk i andre moduler

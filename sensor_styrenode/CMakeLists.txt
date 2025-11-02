@@ -77,6 +77,7 @@ set(PROJECT_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usart.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/sensorNode.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/styreNode.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/dma.c
 
     # 
     

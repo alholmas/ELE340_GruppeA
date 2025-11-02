@@ -37,7 +37,7 @@
 			<type>2</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core</locationURI>
 		</link>
-	
+		
 		<link>
 			<name>Drivers/STM32F3xx_LL_Driver</name>
 			<type>2</type>

@@ -24,6 +24,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include <stdint.h>
 
+
+
 /* Includes drivers------------------------------------------------------------*/
 #include "stm32f3xx_ll_adc.h"
 #include "stm32f3xx_ll_rcc.h"
@@ -119,6 +121,13 @@ void SystemClock_Config(void);
 #define SW1_Pin                             LL_GPIO_PIN_4
 #define SW1_GPIO_Port                       GPIOF
 #define SW1_GPIO_CLK_ENABLE()               LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA)
+
+/**
+  * @brief sensorNode_Enable_PIN PB11
+  */
+#define sensorNode_Enable_PIN                LL_GPIO_PIN_11
+#define sensorNode_Enable_GPIO_Port          GPIOB
+#define sensorNode_Enable_GPIO_CLK_ENABLE()  LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB)
 
 /**
   * @brief Filter CLK Pin PD12

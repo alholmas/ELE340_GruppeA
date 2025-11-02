@@ -28,6 +28,7 @@
 /* Include peripheral drivers -------------------------------------------------*/
 #include "adc.h"
 #include "usart.h"
+#include "dma.h"
 
 
 
@@ -173,20 +174,44 @@ void ADC3_IRQHandler(void)
 
 void USART2_IRQHandler(void)
 {
-  //Sjekk for RXNE flagg (data mottatt og klar i RDR)
-  if (LL_USART_IsActiveFlag_RXNE(USART2)) {
-    USART2_RxReady_Callback();
+  /* TXE: transmit data register empty - feed next byte */
+  if (LL_USART_IsActiveFlag_TXE(USART2)) {
+    USART_TXE_Handler(USART2);
   }
-    
+  /* TC: transmission complete - end of frame */
+  if (LL_USART_IsActiveFlag_TC(USART2)) {
+    USART_TC_Handler(USART2);
+  }
 } 
 
 void USART3_IRQHandler(void)
 {
-  //Sjekk for RXNE flagg (data mottatt og klar i RDR)
-  if (LL_USART_IsActiveFlag_RXNE(USART3)) {
-    USART3_RxReady_Callback();
+ /* TXE: transmit data register empty - feed next byte */
+  if (LL_USART_IsActiveFlag_TXE(USART3)) {
+    USART_TXE_Handler(USART3);
+  }
+
+  /* TC: transmission complete - end of frame */
+  if (LL_USART_IsActiveFlag_TC(USART3)) {
+    USART_TC_Handler(USART3);
   }
 }
+
+
+/* DMA channel IRQ handlers are implemented in Core/Src/dma.c (to centralize DMA handling). */
+void DMA1_Channel3_IRQHandler(void)
+{
+  /* Notify USART DMA handler for channel 3 (USART3 RX in this project) */
+  USART_DMA_Channel3_Handler();
+}
+
+
+void DMA1_Channel6_IRQHandler(void)
+{
+  /* Notify USART DMA handler for channel 6 (USART2 RX in this project) */
+  USART_DMA_Channel6_Handler();
+}
+
 
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

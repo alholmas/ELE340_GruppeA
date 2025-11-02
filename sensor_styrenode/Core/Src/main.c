@@ -1,14 +1,19 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32f303xc.h"
-#include "sensorNode.h"
+#include "stm32f3xx_ll_gpio.h"
+#include "stm32f3xx_ll_rcc.h"
 #include "styreNode.h"
+#include "sensorNode.h"
+#include "stm32f303xc.h"
+
 
 /* Include peripheral drivers -----------------------------------------------*/
 #include "adc.h"
-#include "tim.h"
+#include "dma.h"
 #include "gpio.h"
+#include "tim.h"
 #include "usart.h"
+
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -36,8 +41,13 @@ int main(void)
   
   /* Configure the system clock */
   SystemClock_Config();
+
+  /* Initialize peripherals */
+  DMA_Init();
+  GPIO_Init();
   
-  if (Is_sensorNode())
+  // Sjekker om sensorNode_Enable_PIN er høy for å bestemme modus
+  if (LL_GPIO_IsInputPinSet(sensorNode_Enable_GPIO_Port, sensorNode_Enable_PIN))
   {
     // Sensor Node spesifikk init
     SensorNode_Init();
@@ -48,12 +58,10 @@ int main(void)
     // Styre Node spesifikk init
     StyreNode_Init();
     sensorNode = 0;
-    
   }
 
 
-  // Evt. enkel superloop dersom modulen trenger periodiske kall
-  // Merk: Hvis løsningen deres er avbruddsdrevet, kan denne være tom eller lett.
+  /* Infinite loop for sensor node og styre node */
   while (1)
   {
     if (sensorNode)
@@ -69,8 +77,6 @@ int main(void)
 
 }
 
-
-
 void SystemClock_Config(void)
 {
   LL_FLASH_SetLatency(LL_FLASH_LATENCY_1);
@@ -84,7 +90,7 @@ void SystemClock_Config(void)
   {
 
   }
-  LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE_DIV_1, LL_RCC_PLL_MUL_6);
+  LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE_DIV_1, LL_RCC_PLL_MUL_9);
   LL_RCC_PLL_Enable();
 
    /* Wait till PLL is ready */
@@ -105,6 +111,8 @@ void SystemClock_Config(void)
   LL_SetSystemCoreClock(72000000);
   LL_RCC_SetADCClockSource(LL_RCC_ADC34_CLKSRC_PLL_DIV_1);
 }
+
+
 
 #ifdef  USE_FULL_ASSERT
 /**
