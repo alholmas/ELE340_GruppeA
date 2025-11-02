@@ -1,7 +1,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
+#include "stm32f303xc.h"
 #include "stm32f3xx_ll_usart.h"
 #include <stdint.h>
+#include <string.h>
 
 
 void USART2_Init(void)
@@ -26,13 +28,24 @@ void USART2_Init(void)
   GPIO_InitStruct.Alternate = LL_GPIO_AF_7;
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  LL_DMA_SetDataTransferDirection(DMA1, LL_DMA_CHANNEL_6, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
+
+  LL_DMA_SetChannelPriorityLevel(DMA1, LL_DMA_CHANNEL_6, LL_DMA_PRIORITY_LOW);
+
+  LL_DMA_SetMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_MODE_CIRCULAR);
+
+  LL_DMA_SetPeriphIncMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_PERIPH_NOINCREMENT);
+
+  LL_DMA_SetMemoryIncMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_MEMORY_INCREMENT);
+
+  LL_DMA_SetPeriphSize(DMA1, LL_DMA_CHANNEL_6, LL_DMA_PDATAALIGN_BYTE);
+
+  LL_DMA_SetMemorySize(DMA1, LL_DMA_CHANNEL_6, LL_DMA_MDATAALIGN_BYTE);
+
   /* USART2 interrupt Init */
   NVIC_SetPriority(USART2_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
   NVIC_EnableIRQ(USART2_IRQn);
 
-  // LL_USART_EnableIT_RXNE(USART2);
-  // LL_USART_EnableIT_TXE(USART2);
-  // LL_USART_EnableIT_ERROR(USART2);
 
   USART_InitStruct.BaudRate = 115200;
   USART_InitStruct.DataWidth = LL_USART_DATAWIDTH_8B;
@@ -45,8 +58,6 @@ void USART2_Init(void)
   LL_USART_DisableIT_CTS(USART2);
   LL_USART_ConfigAsyncMode(USART2);
   LL_USART_Enable(USART2);
-  // LL_USART_EnableDirectionTx(USART2);
-
 }
 /* USART3 init function */
 
@@ -72,14 +83,26 @@ void USART3_Init(void)
   GPIO_InitStruct.Alternate = LL_GPIO_AF_7;
   LL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
+  /* USART3 DMA Init */
+
+  /* USART3_RX Init */
+  LL_DMA_SetDataTransferDirection(DMA1, LL_DMA_CHANNEL_3, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
+
+  LL_DMA_SetChannelPriorityLevel(DMA1, LL_DMA_CHANNEL_3, LL_DMA_PRIORITY_LOW);
+
+  LL_DMA_SetMode(DMA1, LL_DMA_CHANNEL_3, LL_DMA_MODE_NORMAL);
+
+  LL_DMA_SetPeriphIncMode(DMA1, LL_DMA_CHANNEL_3, LL_DMA_PERIPH_NOINCREMENT);
+
+  LL_DMA_SetMemoryIncMode(DMA1, LL_DMA_CHANNEL_3, LL_DMA_MEMORY_INCREMENT);
+
+  LL_DMA_SetPeriphSize(DMA1, LL_DMA_CHANNEL_3, LL_DMA_PDATAALIGN_BYTE);
+
+  LL_DMA_SetMemorySize(DMA1, LL_DMA_CHANNEL_3, LL_DMA_MDATAALIGN_BYTE);
+
   /* USART3 interrupt Init */
   NVIC_SetPriority(USART3_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
   NVIC_EnableIRQ(USART3_IRQn);
-
-  LL_USART_EnableIT_RXNE(USART3);
-  // LL_USART_EnableIT_TXE(USART3);
-  // LL_USART_EnableIT_ERROR(USART3);
-
 
   USART_InitStruct.BaudRate = 115200;
   USART_InitStruct.DataWidth = LL_USART_DATAWIDTH_8B;
@@ -92,12 +115,193 @@ void USART3_Init(void)
   LL_USART_DisableIT_CTS(USART3);
   LL_USART_ConfigAsyncMode(USART3);
   LL_USART_Enable(USART3);
-  LL_USART_ReceiveData8(USART3);
-  // LL_USART_EnableDirectionTx(USART3);
 }
 
 
-void USART3_Transmit_sensorNode(uint32_t tid, uint16_t mmAvstand)
+/* ------------------------------------------------------------------
+   Interrupt-driven, buffered transmit implementation
+   Uses TXE interrupt to feed bytes and TC interrupt to detect end
+   of transmission so caller (e.g. ADC EOC ISR) won't block.
+   Supports USART2 and USART3 instances used in this project.
+   ------------------------------------------------------------------ */
+
+#define USART_TX_BUF_SIZE 256
+
+typedef struct {
+  volatile uint8_t busy;
+  uint8_t buf[USART_TX_BUF_SIZE];
+  volatile uint16_t len;
+  volatile uint16_t idx;
+} usart_tx_t;
+
+static usart_tx_t tx_usart2 = {0};
+static usart_tx_t tx_usart3 = {0};
+
+static usart_tx_t* usart_get_tx(USART_TypeDef *USARTx)
+{
+  if (USARTx == USART2) return &tx_usart2;
+  if (USARTx == USART3) return &tx_usart3;
+  return NULL;
+}
+
+/* RX via DMA state */
+typedef struct {
+  uint8_t *buf;
+  uint16_t len;
+  volatile uint8_t active;
+} usart_rx_dma_t;
+
+static usart_rx_dma_t rx_usart2 = {0};
+static usart_rx_dma_t rx_usart3 = {0};
+
+/* Helper to get RX state by USART instance */
+static usart_rx_dma_t* usart_get_rx(USART_TypeDef *USARTx)
+{
+  if (USARTx == USART2) return &rx_usart2;
+  if (USARTx == USART3) return &rx_usart3;
+  return NULL;
+}
+
+/* Start DMA-based RX. Uses DMA1 channels configured elsewhere (MX_DMA_Init).
+ * For this project mapping is:
+ *  - USART3 RX -> DMA1 Channel 3
+ *  - USART2 RX -> DMA1 Channel 6
+ * Caller provides a buffer that DMA will write into.
+ */
+int USART_StartRx_DMA(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
+{
+  if (buffer == NULL || length == 0) return -1;
+
+  DMA_TypeDef *DMAx = DMA1;
+  uint32_t channel = 0;
+  usart_rx_dma_t *rx = usart_get_rx(USARTx);
+  if (rx == NULL) return -1;
+
+  if (USARTx == USART3) {
+    channel = LL_DMA_CHANNEL_3;
+  } else if (USARTx == USART2) {
+    channel = LL_DMA_CHANNEL_6;
+  } else {
+    return -1;
+  }
+
+  /* Check channel not active */
+  if (LL_DMA_IsEnabledChannel(DMAx, channel)) {
+    return -2; /* busy */
+  }
+
+  /* Program peripheral and memory addresses and length */
+  /* Peripheral address: USART RDR (data register for RX). */
+  /* Clear any pending flags for this channel (safe to call) and enable TC/TE interrupts */
+  if (channel == LL_DMA_CHANNEL_3) {
+    LL_DMA_ClearFlag_TC3(DMA1);   
+    LL_DMA_ClearFlag_TE3(DMA1);
+    LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_3);
+    LL_DMA_EnableIT_TE(DMA1, LL_DMA_CHANNEL_3);
+  } else if (channel == LL_DMA_CHANNEL_6) {
+    LL_DMA_ClearFlag_TC6(DMA1);
+    LL_DMA_ClearFlag_TE6(DMA1);
+    LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_6);
+    LL_DMA_EnableIT_TE(DMA1, LL_DMA_CHANNEL_6);
+  }
+
+  LL_DMA_SetPeriphAddress(DMAx, channel, (uint32_t)&(USARTx->RDR));
+  LL_DMA_SetMemoryAddress(DMAx, channel, (uint32_t)buffer);
+  LL_DMA_SetDataLength(DMAx, channel, length);
+
+  /* Enable USART DMA request for RX and enable DMA channel */
+  LL_USART_EnableDMAReq_RX(USARTx);
+  LL_DMA_EnableChannel(DMAx, channel);
+
+  /* store state so IRQ can reference buffer if needed */
+  rx->buf = buffer;
+  rx->len = length;
+  rx->active = 1;
+
+  return 0;
+}
+
+/* DMA IRQ handlers were moved to dma.c to centralize DMA handling. */
+
+/* Called by DMA IRQ handler in dma.c when a transfer completes for a USART.
+ * This function retrieves the internal buffer pointer/length and calls the
+ * user-overridable callback `USART_RxDMAComplete_Callback` with that info.
+ */
+void USART_HandleDMA_RxComplete(USART_TypeDef *USARTx)
+{
+  usart_rx_dma_t *rx = usart_get_rx(USARTx);
+  if (rx == NULL) return;
+  uint8_t *buf = rx->buf;
+  uint16_t len = rx->len;
+  rx->active = 0;
+  if (buf != NULL && len != 0) {
+    USART_RxDMAComplete_Callback(USARTx, buf, len);
+  }
+}
+
+int USART_SendBuffer_IT(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
+{
+  if (buffer == NULL || length == 0) return -1;
+  usart_tx_t *tx = usart_get_tx(USARTx);
+  if (tx == NULL) return -1;
+  if (length > USART_TX_BUF_SIZE) return -3;
+  if (tx->busy) return -2;
+
+  /* Copy into internal buffer so caller can reuse/stack can pop */
+  memcpy(tx->buf, buffer, length);
+  tx->len = length;
+  tx->idx = 0;
+  tx->busy = 1;
+
+  /* Enable TXE interrupt to start transmission (will fire when TXE=1) */
+  LL_USART_EnableIT_TXE(USARTx);
+  return 0;
+}
+
+void USART_TXE_Handler(USART_TypeDef *USARTx)
+{
+  usart_tx_t *tx = usart_get_tx(USARTx);
+  if (tx == NULL) return;
+
+  /* If there are bytes to send, write next byte. */
+  if (tx->idx < tx->len) {
+    LL_USART_TransmitData8(USARTx, tx->buf[tx->idx++]);
+    /* If we've just written the last byte, stop TXE interrupts and enable TC */
+    if (tx->idx >= tx->len) {
+      LL_USART_DisableIT_TXE(USARTx);
+      LL_USART_EnableIT_TC(USARTx);
+    }
+  } else {
+    /* Nothing left: disable TXE and enable TC just in case */
+    LL_USART_DisableIT_TXE(USARTx);
+    LL_USART_EnableIT_TC(USARTx);
+  }
+}
+
+void USART_TC_Handler(USART_TypeDef *USARTx)
+{
+  usart_tx_t *tx = usart_get_tx(USARTx);
+  if (tx == NULL) return;
+
+  /* Clear TC flag and mark not busy */
+  if (LL_USART_IsActiveFlag_TC(USARTx)) {
+    LL_USART_ClearFlag_TC(USARTx);
+  }
+  tx->busy = 0;
+  tx->len = 0;
+  tx->idx = 0;
+}
+
+
+void USART_Tx(USART_TypeDef *USARTx, uint8_t Value)
+{
+  while(!LL_USART_IsActiveFlag_TXE(USARTx))
+  {
+    LL_USART_TransmitData8(USARTx, Value);
+  }
+}
+
+void USART_Transmit_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand)
 {
   uint8_t dataBuffer[8];
   dataBuffer[0] = 0xAA;                     // Header startbyte
@@ -109,16 +313,11 @@ void USART3_Transmit_sensorNode(uint32_t tid, uint16_t mmAvstand)
   dataBuffer[6] = mmAvstand & 0xFF;         // Minst signifikante byte av mmAvstand
   dataBuffer[7] = 0x55;                     // Footer endbyte
 
-  for (int i = 0; i < 8; i++)
-  {
-    while (!LL_USART_IsActiveFlag_TXE(USART3)); // Vent til transmit buffer er tom
-    LL_USART_TransmitData8(USART3, dataBuffer[i]);
-  } 
+  /* Use non-blocking transmit so ADC EOC ISR won't be blocked */
+  (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
-
-
-void USART2_Transmit_styreNode(uint32_t tid, uint16_t mmAvstand, uint16_t mmAvik)
+void USART_Transmit_Tid_Avstand_Avik(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t mmAvik)
 {
   uint8_t dataBuffer[10];
   dataBuffer[0] = 0xAA;                       // Header startbyte
@@ -132,34 +331,12 @@ void USART2_Transmit_styreNode(uint32_t tid, uint16_t mmAvstand, uint16_t mmAvik
   dataBuffer[8] = mmAvik & 0xFF;              // Minst signifikante byte av mmAvik
   dataBuffer[9] = 0x55;                       // Footer endbyte
 
-
-  for (int i = 0; i < 10; i++)
-  {
-    while (!LL_USART_IsActiveFlag_TXE(USART2)); // Vent til transmit buffer er tom
-    LL_USART_TransmitData8(USART2, dataBuffer[i]);
-  } 
+  (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
-// uint8_t[] USART3_Recive_StyreNode(void)
-//   {
-//     uint8_t receivedData[8];
-//     for (int i = 0; i < 8; i++)
-//     {
-//       while (!LL_USART_IsActiveFlag_RXNE(USART3)); // Vent til data er mottatt
-//       receivedData[i] = LL_USART_ReceiveData8(USART3);
-//     }
-//     return receivedData;
-//   }
 
-
-
-void __attribute__((weak)) USART2_RxReady_Callback(void)
+void __attribute__((weak)) USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
 {
-  // Tom default-implementasjon; kan overstyres ved å definere samme funksjon uten __weak i en annen .c-fil
+  /* Default empty implementation; override in application to process received buffer */
+  (void)USARTx; (void)buf; (void)len;
 }
-
-void __attribute__((weak)) USART3_RxReady_Callback(void)
-{
-  // Tom default-implementasjon; kan overstyres ved å definere samme funksjon uten __weak i en annen .c-fil
-} 
-
