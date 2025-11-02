@@ -26,15 +26,6 @@ static volatile uint32_t adc_eoc_count = 0;
 
 /* Private functions ---------------------------------------------------------*/
 
-// int Is_sensorNode(void)
-// {
-//   // Leser PB11(høy verdi aktiverer )
-//   LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB);
-//   LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_11, LL_GPIO_MODE_INPUT);
-//   LL_GPIO_SetPinPull(GPIOB, LL_GPIO_PIN_11, LL_GPIO_PULL_DOWN);
-//   return (LL_GPIO_IsInputPinSet(GPIOB, LL_GPIO_PIN_11) != 0);
-// }
-
 void SensorNode_Init(void)
 {
   /* Initialisering av perifere enheter for sensorNode ----------------*/

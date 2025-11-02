@@ -8,14 +8,22 @@ extern "C" {
 #include "main.h"
 
 /* Init timer ----------------------------------------------------------------*/
+void TIM3_Init(void);
 void TIM4_Init(void);
 void TIM7_Init(void);
 
 /* Metoder for TIM ------------------------------------------------------------*/
+void TIM3_Start_PWM(void);
+void TIM3_Stop_PWM(void);
+int TIM3_SetFrequencyHz(uint32_t freq_hz);
+
 void TIM4_Start_PWM(void);
 void TIM4_Stopp_PWM(void);
+
 void TIM7_Start_TRGO(void);
 void TIM7_Stopp_TRGO(void);
+
+
 
 
 #ifdef __cplusplus
