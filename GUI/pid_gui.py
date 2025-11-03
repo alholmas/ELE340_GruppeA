@@ -32,7 +32,7 @@ class PIDGUI(ttk.Frame):
         self.serieport = None
 
         # Data-buffere for plott
-        self.max_punkt = 2000
+        self.max_punkt = 1000
         self.t_data = deque(maxlen=self.max_punkt)   # tid [s]
         self.pv_data = deque(maxlen=self.max_punkt)  # prosessverdi
 
@@ -150,8 +150,7 @@ class PIDGUI(ttk.Frame):
         self.akse.ticklabel_format(axis="x", style="plain", useOffset=False)
         self.akse.xaxis.set_major_formatter(ScalarFormatter(useOffset=False, useMathText=False))
 
-        # Sett tikk hver 1 ms (1s)
-        self.akse.xaxis.set_major_locator(MultipleLocator(1.s))
+       
 
         self.canvas = FigureCanvasTkAgg(figur, master=hoyre)
         self.canvas.draw()
@@ -374,7 +373,7 @@ class PIDGUI(ttk.Frame):
                 if self._mcu_tid_start is None:
                     self._mcu_tid_start = tid_ms
                 delta_ms = (tid_ms - self._mcu_tid_start) & 0xFFFFFFFF
-                mcu_tid_s = delta_ms / 1000.0
+                mcu_tid_s = delta_ms / 100
 
                 # Logg til fil
                 if self._logg_fil is not None:
