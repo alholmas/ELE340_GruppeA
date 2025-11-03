@@ -19,7 +19,7 @@ class PIDGUI(ttk.Frame):
         # Tema
         self._sett_tema()
 
-        # Tilstandsvariabler (streng for robust validering)
+        # Tilstandsvariabler (konverteres fra streng til int for validering av tegn)
         self.settpunkt_var = tk.StringVar(value="200")
         self.kp_var = tk.StringVar(value="200")
         self.ki_var = tk.StringVar(value="0")     # Ti
@@ -33,19 +33,19 @@ class PIDGUI(ttk.Frame):
         self.max_punkt = 1000
         self.t_data  = deque(maxlen=self.max_punkt)   # tid [s]
         self.pv_data = deque(maxlen=self.max_punkt)   # prosessverdi (avstand mm)
-        self.sp_data = deque(maxlen=self.max_punkt)   # settpunkt tidsserie
+        self.sp_data = deque(maxlen=self.max_punkt)   # settpunkt
 
-        # Låst SP: endres kun ved Start (1) og Oppdater PID (2)
+        # Setter settpunkttil nåværende verdi!
         self.sp_gjeldende = self._parse_int(self.settpunkt_var.get()) or 0
 
-        # Dataserier fra styrenode (direkte mottatt)
+        # Dataserier fra styrenode
         self.err_data = deque(maxlen=self.max_punkt)  # e
         self.u_data   = deque(maxlen=self.max_punkt)  # u
         self.up_data  = deque(maxlen=self.max_punkt)  # up
         self.ui_data  = deque(maxlen=self.max_punkt)  # ui
         self.ud_data  = deque(maxlen=self.max_punkt)  # ud
 
-        # Eksterne callbacks (injiseres fra main)
+        # Eksterne callbacks
         self._pid_callback = None
         self._koble_til_fn = None
         self._koble_fra_fn = None
@@ -59,12 +59,12 @@ class PIDGUI(ttk.Frame):
         self._logg_fil = None
 
         # MCU-tidsrekonstruksjon
-        self._mcu_tid_start = None  # første tid-tikk (uint32) fra styrenode
+        self._mcu_tid_start = None  # Setter plottetid relativ til uC tid ved start
 
         # Bygg UI
         self._bygg_layout()
 
-        # Fyll porter nå og ved dropdown
+        # Fyll porter ved start og ved dropdown
         self._oppdater_porter()
         self.port_cb.bind("<<ComboboxDropdown>>", lambda e: self._oppdater_porter())
 
@@ -93,15 +93,15 @@ class PIDGUI(ttk.Frame):
         return ttk.LabelFrame(parent, text=tittel) if tittel else ttk.Frame(parent)
 
     def _bygg_layout(self):
-        # VIKTIG: pakk venstre panel FØRST, så ender panelet lengst til venstre
+        # Bygg kontrollpanel til venstre
         venstre_panel = self._ramme(self.master)
         venstre_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(12, 8), pady=12)
 
-        # Hovedområde for figurer (stort plott + fem små til høyre)
+        # Bygg plottområde til høyre
         hoved = self._ramme(self.master)
         hoved.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 12), pady=12)
 
-        # --- Venstre kontrollpanel ---
+        # Venstre kontrollpanel oppsett
         ttk.Label(venstre_panel, text="Avstandssensor", font=("Segoe UI", 14, "bold")).pack(
             side=tk.TOP, anchor="w", padx=6, pady=(0, 8)
         )
@@ -144,18 +144,18 @@ class PIDGUI(ttk.Frame):
         self.info_lbl = ttk.Label(venstre_panel, text="Avstand: —")
         self.info_lbl.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(6, 0))
 
-        # --- Stort plott (PV/SP) ---
+        # Plott av avstand og settpunkt
         venstre_fig_frame = ttk.Frame(hoved)
         venstre_fig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
 
-        figur = Figure(figsize=(6.4, 6), dpi=100)  # litt bredere for å være "stort"
+        figur = Figure(figsize=(6.4, 6), dpi=100)
         self.akse = figur.add_subplot(111)
         self.akse.set_title("Avstandsmåling")
         self.akse.set_xlabel("Tid [s]")
         self.akse.set_ylabel("Avstand [mm]")
         self.akse.grid(True, alpha=0.25)
 
-        # Tykkere linjer for tydelig hovedplott
+        # Oppsett av stort plott
         self.linje_pv, = self.akse.plot([], [], label="Avstand (PV)", linewidth=1.6)
         self.linje_sp, = self.akse.plot([], [], linestyle="--", label="Settpunkt (SP)", linewidth=1.4)
         self.akse.legend(loc="upper left", framealpha=0.2, borderaxespad=0.5, fontsize=9)
@@ -164,11 +164,10 @@ class PIDGUI(ttk.Frame):
         self.canvas = FigureCanvasTkAgg(figur, master=venstre_fig_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-        # --- Fem plott i høyre kolonne ---
+        # Høyre plott av PID
         høyre_fig_frame = ttk.Frame(hoved)
         høyre_fig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0))
         høyre_fig_frame.update_idletasks()
-        # Lås en fornuftig bredde for å sikre smal høyrekolonne
         høyre_fig_frame.configure(width=480)
         høyre_fig_frame.pack_propagate(False)
 
@@ -277,7 +276,7 @@ class PIDGUI(ttk.Frame):
             messagebox.showwarning("Ugyldig verdi", "SP/Kp/Ti/Td/IntBegr må være heltall.")
             return
 
-        # Lås SP ved Start (1) og Oppdater PID (2)
+        # Sett settpunkt til gjeldende hvis start eller oppdatering
         if int(start) in (1, 2) and sp is not None:
             self.sp_gjeldende = int(sp)
 
@@ -305,7 +304,7 @@ class PIDGUI(ttk.Frame):
         self.pv_data.append(int(pv))
         self.sp_data.append(int(self.sp_gjeldende))
 
-        # Direkte mottatte deler
+        # Mottatt data fra Styrenode
         self.err_data.append(int(e))
         self.u_data.append(int(u))
         self.up_data.append(int(up))
@@ -416,7 +415,6 @@ class PIDGUI(ttk.Frame):
             return
 
         # Pakkeformat fra styrenode:
-        # <B I H h h h h h B>  (little-endian)
         # header(0xAA), tid(uint32), avstand_mm(uint16),
         # e(int16), u(int16), up(int16), ui(int16), ud(int16), tail(0x55)
         PAKKE = struct.Struct("<BIHhhhhhB")
