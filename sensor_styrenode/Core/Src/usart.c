@@ -221,7 +221,6 @@ int USART_StartRx_DMA(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
   return 0;
 }
 
-/* DMA IRQ handlers were moved to dma.c to centralize DMA handling. */
 
 /* Called by DMA IRQ handler in dma.c when a transfer completes for a USART.
  * This function retrieves the internal buffer pointer/length and calls the
@@ -334,6 +333,7 @@ void USART_Transmit_Tid_Avstand_Avik(USART_TypeDef *USARTx, uint32_t tid, uint16
   (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
+// void USART_Recvie_
 
 void __attribute__((weak)) USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
 {
