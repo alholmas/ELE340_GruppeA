@@ -1,5 +1,6 @@
 #include "tim.h"
 #include "stm32f303xc.h"
+#include "stm32f3xx_ll_gpio.h"
 #include "stm32f3xx_ll_rcc.h"
 #include "stm32f3xx_ll_tim.h"
 
@@ -106,13 +107,13 @@ void TIM4_Init(void)
     /**TIM4 GPIO Configuration
     PD12     ------> TIM4_CH1
     */
-  GPIO_InitStruct.Pin = F_CLK_Pin;
+  GPIO_InitStruct.Pin = LL_GPIO_PIN_12;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
   GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
   GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
   GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
   GPIO_InitStruct.Alternate = LL_GPIO_AF_2;
-  LL_GPIO_Init(F_CLK_GPIO_Port, &GPIO_InitStruct);
+  LL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 }
 
 void TIM4_Start_PWM(void)

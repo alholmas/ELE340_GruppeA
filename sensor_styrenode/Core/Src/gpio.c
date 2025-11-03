@@ -27,7 +27,6 @@ void GPIO_Init(void)
   GPIO_InitStruct.Pull = LL_GPIO_PULL_DOWN;
   LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-
   /*LED 3*/
   GPIO_InitStruct.Pin = LED3_PIN;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
