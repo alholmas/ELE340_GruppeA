@@ -43,25 +43,36 @@ def main():
         print("Status: koblet fra")
 
     # PID-sender
-    def min_pid_handler(settpunkt, kp, ki, kd):
-        HEADER_VERDI = 0xAA
+    def min_pid_handler(settpunkt_mm, kp, ti, td, intbegr, start):
+        HEADER = 0xAA
+        TAIL   = 0x55
+
         sp = getattr(app, "serieport", None)
         if sp is None or not sp.is_open:
             print("Status: ikke tilkoblet – sender ikke PID")
             return
 
         try:
-            # 32-bit: [8-bit header | 24-bit settpunkt] (MSB = header)
-            sp_encoded = ((HEADER_VERDI & 0xFF) << 24) | (int(settpunkt) & 0xFFFFFF)
-
-            # Pakk som USIGNERT 32-bit + tre SIGNERTE 32-bit
-            pkt = struct.pack("<Iiii", sp_encoded, int(kp), int(ki), int(kd))
+            pkt = struct.pack(
+                "<BBHHHHHB",
+                HEADER,
+                int(start),
+                int(kp),
+                int(ti)   & 0xFFFF,
+                int(td),
+                int(intbegr) & 0xFFFF,
+                int(settpunkt_mm) & 0xFFFF, 
+                TAIL
+            )
             sp.write(pkt)
-            print("Sendt 16B pakke: header={}, SP={}, Kp={}, Ki={}, Kd={}".format(
-                HEADER_VERDI, settpunkt, kp, ki, kd
-            ))
+            print(
+                f"Sendt pakke (len={len(pkt)}): "
+                f"H=0x{HEADER:02X}, Start={int(start)}, "
+                f"Kp={int(kp)}, Ti={int(ti)}, Td={int(td)}, IntB={int(intbegr)}, SP={int(settpunkt_mm)}, "
+                f"Tail=0x{TAIL:02X}"
+            )
         except Exception as e:
-            messagebox.showerror("Sendefeil", "Kunne ikke sende PID-verdier: {}".format(e))
+            messagebox.showerror("Sendefeil", f"Kunne ikke sende PID-verdier: {e}")
 
     # Registrer i GUI
     app.registrer_tilkoblingshandler(min_koble_til, min_koble_fra)
@@ -69,7 +80,7 @@ def main():
 
     # Lukking
     def on_close():
-        app.lukk()   # lukk GUI, stopp tråder, lukk port
+        app.lukk()
         rot.destroy()
 
     rot.protocol("WM_DELETE_WINDOW", on_close)

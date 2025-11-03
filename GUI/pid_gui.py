@@ -23,6 +23,7 @@ class PIDGUI(ttk.Frame):
         self.settpunkt_var = tk.StringVar(value="200")
         self.kp_var = tk.StringVar(value="200")
         self.ki_var = tk.StringVar(value="0")
+        self.intbegr_var = tk.StringVar(value="10")
         self.kd_var = tk.StringVar(value="2000")
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
@@ -119,12 +120,15 @@ class PIDGUI(ttk.Frame):
         self._rad_med_entry(pidboks, "Settpunkt", self.settpunkt_var)
         self._rad_med_entry(pidboks, "Kp", self.kp_var)
         self._rad_med_entry(pidboks, "Ti", self.ki_var)
+        self._rad_med_entry(pidboks, "Integrator begrensning", self.intbegr_var)
         self._rad_med_entry(pidboks, "Td", self.kd_var)
 
         radkn = ttk.Frame(pidboks)
         radkn.pack(fill=tk.X, padx=8, pady=(6, 8))
-        ttk.Button(radkn, text="Bruk verdier", command=self._bruk_pid).pack(side=tk.LEFT)
-        ttk.Button(radkn, text="Nullstill graf", command=self._nullstill_graf).pack(side=tk.LEFT, padx=8)
+
+        ttk.Button(radkn, text="Start", command=lambda: self._bruk_pid(start=1)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(radkn, text="Oppdater PID", command=lambda: self._bruk_pid(start=2)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(radkn, text="Stop", command=lambda: (self._bruk_pid(start=0), self._nullstill_graf())).pack(side=tk.LEFT)
 
         # Info-linje
         self.info_lbl = ttk.Label(venstre, text="Avstand: —")
@@ -203,20 +207,18 @@ class PIDGUI(ttk.Frame):
 
     # ---------- Hovedhandlinger ----------
 
-    def _bruk_pid(self):
-        # Hent PID-verdier og kall callback (parsing av heltall)
-        sp = self._parse_int(self.settpunkt_var.get())
-        kp = self._parse_int(self.kp_var.get())
-        ki = self._parse_int(self.ki_var.get())
-        kd = self._parse_int(self.kd_var.get())
-
-        if None in (sp, kp, ki, kd):
-            messagebox.showwarning("Ugyldig verdi", "Settpunkt/Kp/Ki/Kd må være heltall.")
+    def _bruk_pid(self, start):
+        sp  = self._parse_int(self.settpunkt_var.get())
+        kp  = self._parse_int(self.kp_var.get())
+        ti  = self._parse_int(self.ki_var.get())       # "Ti" i UI
+        td  = self._parse_int(self.kd_var.get())       # "Td" i UI
+        ib  = self._parse_int(self.intbegr_var.get())  # integrator-begr.
+        if None in (sp, kp, ti, td, ib):
+            messagebox.showwarning("Ugyldig verdi", "SP/Kp/Ti/Td/IntBegr må være heltall.")
             return
-
         try:
             if callable(self._pid_callback):
-                self._pid_callback(sp, kp, ki, kd)
+                self._pid_callback(sp, kp, ti, td, ib, int(start))
             else:
                 messagebox.showinfo("Ingen handler", "Ingen PID-handler registrert.")
         except Exception as e:
