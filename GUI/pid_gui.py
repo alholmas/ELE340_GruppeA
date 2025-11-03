@@ -13,7 +13,7 @@ class PIDGUI(ttk.Frame):
     def __init__(self, master):
         super().__init__(master)
         self.master.title("PID styring av avstandssensor")
-        self.master.geometry("1400x600")
+        self.master.geometry("1400x800")
         self.master.minsize(820, 520)
 
         # Tema
@@ -29,11 +29,21 @@ class PIDGUI(ttk.Frame):
         self.filnavn_var = tk.StringVar(value="logg.txt")
         self.serieport = None  # serial.Serial eller None
 
-        # Data-buffere for plott
+        # Data-buffere for plott (PV/SP)
         self.max_punkt = 1000
         self.t_data  = deque(maxlen=self.max_punkt)   # tid [s]
-        self.pv_data = deque(maxlen=self.max_punkt)   # prosessverdi
-        self.sp_data = deque(maxlen=self.max_punkt)   # settpunkt (tidsserie)
+        self.pv_data = deque(maxlen=self.max_punkt)   # prosessverdi (avstand mm)
+        self.sp_data = deque(maxlen=self.max_punkt)   # settpunkt tidsserie
+
+        # Låst SP: endres kun ved Start (1) og Oppdater PID (2)
+        self.sp_gjeldende = self._parse_int(self.settpunkt_var.get()) or 0
+
+        # Dataserier fra styrenode (direkte mottatt)
+        self.err_data = deque(maxlen=self.max_punkt)  # e
+        self.u_data   = deque(maxlen=self.max_punkt)  # u
+        self.up_data  = deque(maxlen=self.max_punkt)  # up
+        self.ui_data  = deque(maxlen=self.max_punkt)  # ui
+        self.ud_data  = deque(maxlen=self.max_punkt)  # ud
 
         # Eksterne callbacks (injiseres fra main)
         self._pid_callback = None
@@ -49,7 +59,7 @@ class PIDGUI(ttk.Frame):
         self._logg_fil = None
 
         # MCU-tidsrekonstruksjon
-        self._mcu_tid_start = None  # første MCU-tid i ms
+        self._mcu_tid_start = None  # første tid-tikk (uint32) fra styrenode
 
         # Bygg UI
         self._bygg_layout()
@@ -83,18 +93,20 @@ class PIDGUI(ttk.Frame):
         return ttk.LabelFrame(parent, text=tittel) if tittel else ttk.Frame(parent)
 
     def _bygg_layout(self):
-        venstre = self._ramme(self.master)
-        venstre.pack(side=tk.LEFT, fill=tk.Y, padx=(12, 8), pady=12)
+        # VIKTIG: pakk venstre panel FØRST, så ender panelet lengst til venstre
+        venstre_panel = self._ramme(self.master)
+        venstre_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(12, 8), pady=12)
 
-        hoyre = self._ramme(self.master)
-        hoyre.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 12), pady=12)
+        # Hovedområde for figurer (stort plott + fem små til høyre)
+        hoved = self._ramme(self.master)
+        hoved.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 12), pady=12)
 
-        ttk.Label(venstre, text="Avstandssensor", font=("Segoe UI", 14, "bold")).pack(
+        # --- Venstre kontrollpanel ---
+        ttk.Label(venstre_panel, text="Avstandssensor", font=("Segoe UI", 14, "bold")).pack(
             side=tk.TOP, anchor="w", padx=6, pady=(0, 8)
         )
 
-        # Tilkoblingsboks
-        tilk_boks = self._ramme(venstre)
+        tilk_boks = self._ramme(venstre_panel)
         tilk_boks.pack(fill=tk.X, padx=0, pady=(0, 10))
 
         rad_port = ttk.Frame(tilk_boks)
@@ -109,14 +121,13 @@ class PIDGUI(ttk.Frame):
         self.koble_knapp = ttk.Button(rad_knapp, text="Koble til", command=self._toggle_tilkobling)
         self.koble_knapp.pack(side=tk.LEFT)
         self._rad_med_entry(tilk_boks, "Filnavn på logg:", self.filnavn_var)
-        self.status_lbl = ttk.Label(venstre, text="Status: frakoblet")
+        self.status_lbl = ttk.Label(venstre_panel, text="Status: frakoblet")
         self.status_lbl.pack(fill=tk.X, padx=4, pady=(6, 10))
 
-        # PID-innstillinger
-        ttk.Label(venstre, text="PID-innstillinger", font=("Segoe UI", 14, "bold")).pack(
+        ttk.Label(venstre_panel, text="PID-innstillinger", font=("Segoe UI", 14, "bold")).pack(
             side=tk.TOP, anchor="w", padx=6, pady=(0, 8)
         )
-        pidboks = self._ramme(venstre)
+        pidboks = self._ramme(venstre_panel)
         pidboks.pack(fill=tk.X, padx=0, pady=(0, 10))
         self._rad_med_entry(pidboks, "Settpunkt", self.settpunkt_var)
         self._rad_med_entry(pidboks, "Kp", self.kp_var)
@@ -126,32 +137,73 @@ class PIDGUI(ttk.Frame):
 
         radkn = ttk.Frame(pidboks)
         radkn.pack(fill=tk.X, padx=8, pady=(6, 8))
-        ttk.Button(radkn, text="Start",         command=lambda: self._bruk_pid(start=1)).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(radkn, text="Oppdater PID",  command=lambda: self._bruk_pid(start=2)).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(radkn, text="Stop",          command=lambda: (self._bruk_pid(start=0), self._nullstill_graf())).pack(side=tk.LEFT)
+        ttk.Button(radkn, text="Start",        command=lambda: self._bruk_pid(start=1)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(radkn, text="Oppdater PID", command=lambda: self._bruk_pid(start=2)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(radkn, text="Stop",         command=lambda: (self._bruk_pid(start=0), self._nullstill_graf())).pack(side=tk.LEFT)
 
-        # Info-linje
-        self.info_lbl = ttk.Label(venstre, text="Avstand: —")
+        self.info_lbl = ttk.Label(venstre_panel, text="Avstand: —")
         self.info_lbl.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(6, 0))
 
-        # Matplotlib-figur
-        figur = Figure(figsize=(5, 4), dpi=100)
+        # --- Stort plott (PV/SP) ---
+        venstre_fig_frame = ttk.Frame(hoved)
+        venstre_fig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
+
+        figur = Figure(figsize=(7.5, 6), dpi=100)  # litt bredere for å være "stort"
         self.akse = figur.add_subplot(111)
         self.akse.set_title("Avstandsmåling")
         self.akse.set_xlabel("Tid [s]")
-        self.akse.set_ylabel("Avstand")
+        self.akse.set_ylabel("Avstand [mm]")
         self.akse.grid(True, alpha=0.25)
 
-        # Linjer (PV og SP begge som tidsserier)
-        self.linje_pv, = self.akse.plot([], [], label="Avstand (PV)")
-        self.linje_sp, = self.akse.plot([], [], linestyle="--", label="Settpunkt (SP)")
+        # Tykkere linjer for tydelig hovedplott
+        self.linje_pv, = self.akse.plot([], [], label="Avstand (PV)", linewidth=1.6)
+        self.linje_sp, = self.akse.plot([], [], linestyle="--", label="Settpunkt (SP)", linewidth=1.4)
         self.akse.legend(loc="upper left", framealpha=0.2, borderaxespad=0.5, fontsize=9)
-
-        # Tving vekk vitenskapelig notasjon og offset på X
         self.akse.ticklabel_format(axis="x", style="plain", useOffset=False)
 
-        self.canvas = FigureCanvasTkAgg(figur, master=hoyre)
+        self.canvas = FigureCanvasTkAgg(figur, master=venstre_fig_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # --- Fem plott i høyre kolonne ---
+        høyre_fig_frame = ttk.Frame(hoved)
+        høyre_fig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(8, 0))
+        høyre_fig_frame.update_idletasks()
+        # Lås en fornuftig bredde for å sikre smal høyrekolonne
+        høyre_fig_frame.configure(width=480)
+        høyre_fig_frame.pack_propagate(False)
+
+        figur5 = Figure(figsize=(4.8, 9.2), dpi=100)  # smal og høy
+        gs = figur5.add_gridspec(5, 1, hspace=0.55)   # MER LUFT mellom de fem
+
+        self.ax_e  = figur5.add_subplot(gs[0, 0])
+        self.ax_u  = figur5.add_subplot(gs[1, 0], sharex=self.ax_e)
+        self.ax_up = figur5.add_subplot(gs[2, 0], sharex=self.ax_e)
+        self.ax_ui = figur5.add_subplot(gs[3, 0], sharex=self.ax_e)
+        self.ax_ud = figur5.add_subplot(gs[4, 0], sharex=self.ax_e)
+
+        self.ax_e.set_title("Avvik e [mm]")
+        self.ax_u.set_title("Pådrag u")
+        self.ax_up.set_title("P-del")
+        self.ax_ui.set_title("I-del")
+        self.ax_ud.set_title("D-del")
+        self.ax_ud.set_xlabel("Tid [s]")
+
+        # Grid + ryddige akser
+        for i, ax in enumerate((self.ax_e, self.ax_u, self.ax_up, self.ax_ui, self.ax_ud)):
+            ax.grid(True, alpha=0.25)
+            ax.ticklabel_format(axis="x", style="plain", useOffset=False)
+            if i < 4:
+                # Skjul x-etiketter for de øverste 4 for å spare plass
+                ax.label_outer()
+
+        self.linje_e,  = self.ax_e.plot([], [], linewidth=1.2)
+        self.linje_u,  = self.ax_u.plot([], [], linewidth=1.2)
+        self.linje_up, = self.ax_up.plot([], [], linewidth=1.2)
+        self.linje_ui, = self.ax_ui.plot([], [], linewidth=1.2)
+        self.linje_ud, = self.ax_ud.plot([], [], linewidth=1.2)
+
+        self.canvas5 = FigureCanvasTkAgg(figur5, master=høyre_fig_frame)
+        self.canvas5.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def _rad_med_entry(self, parent, etikett, var):
         rad = ttk.Frame(parent)
@@ -164,7 +216,6 @@ class PIDGUI(ttk.Frame):
 
     @staticmethod
     def _parse_int(s):
-        # Parsing av heltall fra streng
         s = (s or "").strip()
         if s in ("", "+", "-"):
             return None
@@ -208,15 +259,19 @@ class PIDGUI(ttk.Frame):
     # ---------- Hovedhandlinger ----------
 
     def _bruk_pid(self, start):
-        # Hent verdier fra UI
         sp  = self._parse_int(self.settpunkt_var.get())
         kp  = self._parse_int(self.kp_var.get())
-        ti  = self._parse_int(self.ki_var.get())   # "Ti" i UI
-        td  = self._parse_int(self.kd_var.get())   # "Td" i UI
+        ti  = self._parse_int(self.ki_var.get())
+        td  = self._parse_int(self.kd_var.get())
         ib  = self._parse_int(self.intbegr_var.get())
         if None in (sp, kp, ti, td, ib):
             messagebox.showwarning("Ugyldig verdi", "SP/Kp/Ti/Td/IntBegr må være heltall.")
             return
+
+        # Lås SP ved Start (1) og Oppdater PID (2)
+        if int(start) in (1, 2) and sp is not None:
+            self.sp_gjeldende = int(sp)
+
         try:
             if callable(self._pid_callback):
                 self._pid_callback(sp, kp, ti, td, ib, int(start))
@@ -229,28 +284,47 @@ class PIDGUI(ttk.Frame):
         self.t_data.clear()
         self.pv_data.clear()
         self.sp_data.clear()
+        self.err_data.clear()
+        self.u_data.clear()
+        self.up_data.clear()
+        self.ui_data.clear()
+        self.ud_data.clear()
         self._oppdater_plott()
 
-    def oppdater_data(self, tid_s, pv):
-        """Kalles fra GUI-tråd (via _tøm_kø_og_oppdater) for hvert ny målepunkt."""
+    def oppdater_data(self, tid_s, pv, e, u, up, ui, ud):
+        """Kalles i GUI-tråd for hvert nytt målepunkt med full telemetri."""
         self.t_data.append(float(tid_s))
         self.pv_data.append(int(pv))
+        self.sp_data.append(int(self.sp_gjeldende))
 
-        # Les gjeldende SP fra feltet og logg det som tidsserie (trappeform)
-        sp_now = self._parse_int(self.settpunkt_var.get())
-        self.sp_data.append(0 if sp_now is None else int(sp_now))
+        # Direkte mottatte deler
+        self.err_data.append(int(e))
+        self.u_data.append(int(u))
+        self.up_data.append(int(up))
+        self.ui_data.append(int(ui))
+        self.ud_data.append(int(ud))
 
         self.info_lbl.config(text=f"Avstand: {int(pv)}")
         self._oppdater_plott()
 
     def _oppdater_plott(self):
-        # Tegn PV og SP som tidsserier
+        # Venstre (stort plott)
         self.linje_pv.set_data(self.t_data, self.pv_data)
         self.linje_sp.set_data(self.t_data, self.sp_data)
-
         self.akse.relim()
         self.akse.autoscale_view()
         self.canvas.draw_idle()
+
+        # Høyre (5 plott)
+        self.linje_e.set_data(self.t_data, self.err_data)
+        self.linje_u.set_data(self.t_data, self.u_data)
+        self.linje_up.set_data(self.t_data, self.up_data)
+        self.linje_ui.set_data(self.t_data, self.ui_data)
+        self.linje_ud.set_data(self.t_data, self.ud_data)
+        for ax in (self.ax_e, self.ax_u, self.ax_up, self.ax_ui, self.ax_ud):
+            ax.relim()
+            ax.autoscale_view()
+        self.canvas5.draw_idle()
 
     # ---------- Tilkobling / port / tråd ----------
 
@@ -268,7 +342,6 @@ class PIDGUI(ttk.Frame):
 
     def _toggle_tilkobling(self):
         if not bool(self.serieport and self.serieport.is_open):
-            # --- Koble til ---
             try:
                 if not callable(self._koble_til_fn):
                     raise RuntimeError("Tilkoblingshandler ikke satt.")
@@ -282,7 +355,6 @@ class PIDGUI(ttk.Frame):
                 messagebox.showerror("Tilkoblingsfeil", str(e))
                 self._trygg_lukk_port()
         else:
-            # --- Koble fra ---
             self._stopp_logging()
             if callable(self._koble_fra_fn):
                 try:
@@ -290,7 +362,6 @@ class PIDGUI(ttk.Frame):
                 except Exception as e:
                     messagebox.showerror("Frakoblingsfeil", str(e))
             self._trygg_lukk_port()
-
         self._oppdater_status_from_port()
 
     # ---------- Logging og lesetråd ----------
@@ -301,12 +372,11 @@ class PIDGUI(ttk.Frame):
         try:
             filnavn = (self.filnavn_var.get() or "").strip() or "logg.txt"
             self._logg_fil = open(filnavn, "a", buffering=1, encoding="utf-8")
-            self._logg_fil.write("tid_s,pv,sp\n")
+            self._logg_fil.write("tid_s,pv,sp,e,u,up,ui,ud\n")
         except Exception as e:
             messagebox.showerror("Loggfil-feil", f"Kunne ikke åpne loggfil: {e}")
             self._logg_fil = None
 
-        # Start lesetråd
         self._lesetraads_stop.clear()
         self._mcu_tid_start = None
         self._lesetraad = threading.Thread(target=self._les_loop, name="les_serie", daemon=True)
@@ -332,9 +402,11 @@ class PIDGUI(ttk.Frame):
         if sp is None or not sp.is_open:
             return
 
-        # Innkommende pakke (MCU -> PC): <B I H B>  = 1 + 4 + 2 + 1 = 8 byte
-        # header(0xAA), tid_ms(uint32), verdi(uint16), tail(0x55)
-        PAKKE = struct.Struct("<BIHB")
+        # Pakkeformat fra styrenode:
+        # <B I H h h h h h B>  (little-endian)
+        # header(0xAA), tid(uint32), avstand_mm(uint16),
+        # e(int16), u(int16), up(int16), ui(int16), ud(int16), tail(0x55)
+        PAKKE = struct.Struct("<BIHhhhhhB")
 
         while not self._lesetraads_stop.is_set() and sp.is_open:
             try:
@@ -343,56 +415,49 @@ class PIDGUI(ttk.Frame):
                 if not b or b[0] != 0xAA:
                     continue
 
-                # Les resten av pakken (7 byte)
+                # Les resten av pakken
                 rest = sp.read(PAKKE.size - 1)
                 if len(rest) != PAKKE.size - 1:
                     continue
 
-                hdr, tid_ms, verdi, tlr = PAKKE.unpack(b + rest)
+                hdr, tid_raw, avstand, e, u, up, ui, ud, tlr = PAKKE.unpack(b + rest)
                 if tlr != 0x55:
                     continue
 
-                # Relativ tid i sekunder (bytt til /1000.0 hvis MCU gir millisekund)
+                # Relativ tid i sekunder (antatt tid_raw i 10 ms ticks -> /100)
                 if self._mcu_tid_start is None:
-                    self._mcu_tid_start = tid_ms
-                delta_ms = (tid_ms - self._mcu_tid_start) & 0xFFFFFFFF
-                mcu_tid_s = delta_ms / 100.0
+                    self._mcu_tid_start = tid_raw
+                delta = (tid_raw - self._mcu_tid_start) & 0xFFFFFFFF
+                tid_s = delta / 100.0  # 10 ms per tick
 
-                # Logg til fil: tid, PV, SP (SP fra nåværende UI-verdi)
+                # Logg til fil: tid, PV, SP, e, u, up, ui, ud
                 if self._logg_fil is not None:
-                    sp_now = self._parse_int(self.settpunkt_var.get())
-                    sp_now = 0 if sp_now is None else int(sp_now)
-                    self._logg_fil.write(f"{mcu_tid_s},{int(verdi)},{sp_now}\n")
+                    self._logg_fil.write(
+                        f"{tid_s},{int(avstand)},{int(self.sp_gjeldende)},{int(e)},{int(u)},{int(up)},{int(ui)},{int(ud)}\n"
+                    )
 
-                # Legg på GUI-kø (tid, PV) – SP hentes i oppdater_data()
-                self._lesetraads_kø.put((mcu_tid_s, int(verdi)))
+                # Legg på GUI-kø
+                self._lesetraads_kø.put((tid_s, avstand, e, u, up, ui, ud))
 
-            except Exception as e:
-                print(f"Lesefeil: {e}")
+            except Exception as e_exc:
+                print(f"Lesefeil: {e_exc}")
                 try:
                     if sp and sp.is_open:
                         sp.close()
                 except Exception:
                     pass
                 self.serieport = None
-
-                # synkroniser UI i hovedtråd
                 self.after(50, self._oppdater_status_from_port)
                 break
 
     def _tøm_kø_og_oppdater(self):
-        # Tøm datakø
         try:
             while True:
-                tid_s, pv = self._lesetraads_kø.get_nowait()
-                self.oppdater_data(tid_s, pv)
+                tid_s, pv, e, u, up, ui, ud = self._lesetraads_kø.get_nowait()
+                self.oppdater_data(tid_s, pv, e, u, up, ui, ud)
         except queue.Empty:
             pass
-
-        # Hold knapp/status i sync med faktisk portstatus
         self._oppdater_status_from_port()
-
-        # Neste poll
         self.after(50, self._tøm_kø_og_oppdater)
 
     def lukk(self):
