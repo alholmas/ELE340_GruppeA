@@ -13,7 +13,7 @@ class PIDGUI(ttk.Frame):
     def __init__(self, master):
         super().__init__(master)
         self.master.title("PID styring av avstandssensor")
-        self.master.geometry("1400x1000")
+        self.master.geometry("1400x800")
         self.master.minsize(820, 520)
 
         # Tema
