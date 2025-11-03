@@ -379,7 +379,7 @@ class PIDGUI(ttk.Frame):
                 # Logg til fil
                 if self._logg_fil is not None:
                     try:
-                        self._logg_fil.write(f"{mcu_tid_s:.3f},{int(verdi)}\n")
+                        self._logg_fil.write(f"{mcu_tid_s},{int(verdi)}\n")
                     except Exception as le:
                         self._status_kø.put(f"Loggfeil: {le}")
 
