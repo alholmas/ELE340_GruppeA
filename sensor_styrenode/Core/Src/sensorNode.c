@@ -20,20 +20,10 @@
 static volatile uint32_t tid = 0;
 static volatile uint16_t adc_mV = 0;
 static volatile uint16_t avsand_mm = 0;
-static volatile uint32_t adc_eoc_count = 0;
 /* Private function prototypes -----------------------------------------------*/
 
 
 /* Private functions ---------------------------------------------------------*/
-
-// int Is_sensorNode(void)
-// {
-//   // Leser PB11(høy verdi aktiverer )
-//   LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB);
-//   LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_11, LL_GPIO_MODE_INPUT);
-//   LL_GPIO_SetPinPull(GPIOB, LL_GPIO_PIN_11, LL_GPIO_PULL_DOWN);
-//   return (LL_GPIO_IsInputPinSet(GPIOB, LL_GPIO_PIN_11) != 0);
-// }
 
 void SensorNode_Init(void)
 {
@@ -94,8 +84,7 @@ uint16_t konverter_mm(uint16_t adc_mV)
 void ADC3_EndOfConversion_Callback(void)
 {
   tid++;
-  adc_eoc_count++;
-  
+
   // Les ADC-DR (vanligvis clear'er dette EOC)
   adc_mV = (uint16_t)LL_ADC_REG_ReadConversionData12(ADC3);
   avsand_mm = konverter_mm(adc_mV);
@@ -103,9 +92,4 @@ void ADC3_EndOfConversion_Callback(void)
 
   // Send data via USART3
   USART_Transmit_Tid_Avstand(USART3, tid, avsand_mm);
-
-  /* Debug: toggle LED3 every 50 callbacks so we can visually/logic-check EOC */
-  if ((adc_eoc_count % 50) == 0) {
-    LL_GPIO_TogglePin(LED3_GPIO_PORT, LED3_PIN);
-  }
 }

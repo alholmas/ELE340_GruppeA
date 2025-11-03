@@ -7,6 +7,7 @@
 #include "adc.h"
 #include "stm32f3xx_ll_gpio.h"
 #include "stm32f3xx_ll_usart.h"
+#include "stm32f3xx_ll_utils.h"
 #include "tim.h"
 #include "gpio.h"
 #include "usart.h"
@@ -22,9 +23,7 @@ static uint8_t usart3_Rx_buf[8];
 void StyreNode_Init(void)
 {
   /* Initialisering av perifere enheter for sensorNode ----------------*/
-  TIM4_Init();
-  TIM7_Init();
-  ADC3_Init();
+  TIM3_Init();
   USART2_Init();
   USART3_Init();
   GPIO_Init();
@@ -35,11 +34,17 @@ void StyreNode_Init(void)
   
   /* Oppstart av perifere enheter for sensorNode ----------------------*/
   (void)USART_StartRx_DMA(USART3, usart3_Rx_buf, sizeof(usart3_Rx_buf));
+  TIM3_Start_PWM();
+
 }
 
 void StyreNode_Loop(void)
 {
-	// TODO: Kjør periodiske oppgaver for styre-node her hvis nødvendig
+	  for (int i = 0; i < 100; i++)
+  {
+    (void)TIM3_SetFrequencyHz(10000 + i * 100);
+    LL_mDelay(500);
+  }
 }
 /* SensorNode spesifikke funksjoner -------------------------------------*/
 
