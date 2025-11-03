@@ -257,6 +257,7 @@ int USART_SendBuffer_IT(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
   return 0;
 }
 
+// USART transmit register empty handler
 void USART_TXE_Handler(USART_TypeDef *USARTx)
 {
   usart_tx_t *tx = usart_get_tx(USARTx);
@@ -277,6 +278,7 @@ void USART_TXE_Handler(USART_TypeDef *USARTx)
   }
 }
 
+// USART Transmission Complete handler
 void USART_TC_Handler(USART_TypeDef *USARTx)
 {
   usart_tx_t *tx = usart_get_tx(USARTx);
@@ -291,47 +293,59 @@ void USART_TC_Handler(USART_TypeDef *USARTx)
   tx->idx = 0;
 }
 
-
-void USART_Tx(USART_TypeDef *USARTx, uint8_t Value)
-{
-  while(!LL_USART_IsActiveFlag_TXE(USARTx))
-  {
-    LL_USART_TransmitData8(USARTx, Value);
-  }
-}
+// // USART transmit 1byte
+// void USART_Tx(USART_TypeDef *USARTx, uint8_t Value)
+// {
+//   while(!LL_USART_IsActiveFlag_TXE(USARTx))
+//   {
+//     LL_USART_TransmitData8(USARTx, Value);
+//   }
+// }
 
 void USART_Transmit_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand)
 {
   uint8_t dataBuffer[8];
   dataBuffer[0] = 0xAA;                     // Header startbyte
-  dataBuffer[1] = (tid >> 24) & 0xFF;       // Mest signifikante byte av tid
-  dataBuffer[2] = (tid >> 16) & 0xFF;
-  dataBuffer[3] = (tid >> 8) & 0xFF;
-  dataBuffer[4] = tid & 0xFF;               // Minst signifikante byte av tid
-  dataBuffer[5] = (mmAvstand >> 8) & 0xFF;  // Mest signifikante byte av mmAvstand
-  dataBuffer[6] = mmAvstand & 0xFF;         // Minst signifikante byte av mmAvstand
+  dataBuffer[1] = tid & 0xFF;               // Least significant byte av tid (little-endian)
+  dataBuffer[2] = (tid >> 8) & 0xFF;
+  dataBuffer[3] = (tid >> 16) & 0xFF;
+  dataBuffer[4] = (tid >> 24) & 0xFF;       // Most significant byte av tid
+  dataBuffer[5] = mmAvstand & 0xFF;         // Least significant byte av mmAvstand (little-endian)
+  dataBuffer[6] = (mmAvstand >> 8) & 0xFF;  // Most significant byte av mmAvstand
   dataBuffer[7] = 0x55;                     // Footer endbyte
 
   /* Use non-blocking transmit so ADC EOC ISR won't be blocked */
   (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
+void USART_Transmit_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte)
+{
+  uint8_t dataBuffer[3];
+  dataBuffer[0] = 0xAA;                       // Header startbyte
+  dataBuffer[1] = start_stop_byte;            // Start/Stop byte
+  dataBuffer[2] = 0x55;                       // Footer endbyte
+
+  (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+}
+
+
 void USART_Transmit_Tid_Avstand_Avik(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t mmAvik)
 {
   uint8_t dataBuffer[10];
   dataBuffer[0] = 0xAA;                       // Header startbyte
-  dataBuffer[1] = (tid >> 24) & 0xFF;         // Mest signifikante byte av tid
-  dataBuffer[2] = (tid >> 16) & 0xFF;
-  dataBuffer[3] = (tid >> 8) & 0xFF;
-  dataBuffer[4] = tid & 0xFF;                 // Minst signifikante byte av tid
-  dataBuffer[5] = (mmAvstand >> 8) & 0xFF;    // Mest signifikante byte av mmAvstand
-  dataBuffer[6] = mmAvstand & 0xFF;           // Minst signifikante byte av mmAvstand
-  dataBuffer[7] = (mmAvik >> 8) & 0xFF;       // Mest signifikante byte av mmAvik
-  dataBuffer[8] = mmAvik & 0xFF;              // Minst signifikante byte av mmAvik
+  dataBuffer[1] = tid & 0xFF;                 // Least significant byte av tid (little-endian)
+  dataBuffer[2] = (tid >> 8) & 0xFF;
+  dataBuffer[3] = (tid >> 16) & 0xFF;
+  dataBuffer[4] = (tid >> 24) & 0xFF;         // Most significant byte av tid
+  dataBuffer[5] = mmAvstand & 0xFF;           // Least significant byte av mmAvstand (little-endian)
+  dataBuffer[6] = (mmAvstand >> 8) & 0xFF;    // Most significant byte av mmAvstand
+  dataBuffer[7] = mmAvik & 0xFF;              // Least significant byte av mmAvik (little-endian)
+  dataBuffer[8] = (mmAvik >> 8) & 0xFF;       // Most significant byte av mmAvik
   dataBuffer[9] = 0x55;                       // Footer endbyte
 
   (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
+
 
 
 

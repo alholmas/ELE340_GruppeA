@@ -44,6 +44,9 @@ void SensorNode_Init(void)
   ADC3_StartConversion_TRGO(); 
   //Start av PWM 4000 Hz knekkfrekvens filter 
   TIM4_Start_PWM();
+
+
+  
 }
 
 void SensorNode_Loop(void)
@@ -93,3 +96,10 @@ void ADC3_EndOfConversion_Callback(void)
   // Send data via USART3
   USART_Transmit_Tid_Avstand(USART3, tid, avsand_mm);
 }
+
+
+
+// void USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
+// {
+//   // SensorNode forventer ingen innkommende data, så denne kan være tom
+// }
