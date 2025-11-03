@@ -148,7 +148,7 @@ class PIDGUI(ttk.Frame):
         venstre_fig_frame = ttk.Frame(hoved)
         venstre_fig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
 
-        figur = Figure(figsize=(7.5, 6), dpi=100)  # litt bredere for å være "stort"
+        figur = Figure(figsize=(6.4, 6), dpi=100)  # litt bredere for å være "stort"
         self.akse = figur.add_subplot(111)
         self.akse.set_title("Avstandsmåling")
         self.akse.set_xlabel("Tid [s]")
@@ -166,14 +166,15 @@ class PIDGUI(ttk.Frame):
 
         # --- Fem plott i høyre kolonne ---
         høyre_fig_frame = ttk.Frame(hoved)
-        høyre_fig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(8, 0))
+        høyre_fig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0))
         høyre_fig_frame.update_idletasks()
         # Lås en fornuftig bredde for å sikre smal høyrekolonne
         høyre_fig_frame.configure(width=480)
         høyre_fig_frame.pack_propagate(False)
 
-        figur5 = Figure(figsize=(4.8, 9.2), dpi=100)  # smal og høy
-        gs = figur5.add_gridspec(5, 1, hspace=0.55)   # MER LUFT mellom de fem
+        figur5 = Figure(figsize=(6.2, 9.2), dpi=100)
+        gs = figur5.add_gridspec(5, 1, hspace=0.55)
+        figur5.subplots_adjust(right=0.84)
 
         self.ax_e  = figur5.add_subplot(gs[0, 0])
         self.ax_u  = figur5.add_subplot(gs[1, 0], sharex=self.ax_e)
@@ -202,6 +203,14 @@ class PIDGUI(ttk.Frame):
         self.linje_ui, = self.ax_ui.plot([], [], linewidth=1.2)
         self.linje_ud, = self.ax_ud.plot([], [], linewidth=1.2)
 
+        # Tekstfelt for verdier til høyre for hvert subplot
+        bbox_stil = dict(boxstyle="round,pad=0.2", fc=(1, 1, 1, 0.08), ec=(1, 1, 1, 0.25))
+        self.valtxt_e  = self.ax_e .text(1.02, 0.5, "—", transform=self.ax_e .transAxes, va="center", ha="left", fontsize=9, bbox=bbox_stil)
+        self.valtxt_u  = self.ax_u .text(1.02, 0.5, "—", transform=self.ax_u .transAxes, va="center", ha="left", fontsize=9, bbox=bbox_stil)
+        self.valtxt_up = self.ax_up.text(1.02, 0.5, "—", transform=self.ax_up.transAxes, va="center", ha="left", fontsize=9, bbox=bbox_stil)
+        self.valtxt_ui = self.ax_ui.text(1.02, 0.5, "—", transform=self.ax_ui.transAxes, va="center", ha="left", fontsize=9, bbox=bbox_stil)
+        self.valtxt_ud = self.ax_ud.text(1.02, 0.5, "—", transform=self.ax_ud.transAxes, va="center", ha="left", fontsize=9, bbox=bbox_stil)
+                                        
         self.canvas5 = FigureCanvasTkAgg(figur5, master=høyre_fig_frame)
         self.canvas5.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
@@ -292,7 +301,6 @@ class PIDGUI(ttk.Frame):
         self._oppdater_plott()
 
     def oppdater_data(self, tid_s, pv, e, u, up, ui, ud):
-        """Kalles i GUI-tråd for hvert nytt målepunkt med full telemetri."""
         self.t_data.append(float(tid_s))
         self.pv_data.append(int(pv))
         self.sp_data.append(int(self.sp_gjeldende))
@@ -321,6 +329,11 @@ class PIDGUI(ttk.Frame):
         self.linje_up.set_data(self.t_data, self.up_data)
         self.linje_ui.set_data(self.t_data, self.ui_data)
         self.linje_ud.set_data(self.t_data, self.ud_data)
+        self.valtxt_e.set_text(str(self.err_data[-1]) if self.err_data else "—")
+        self.valtxt_u.set_text(str(self.u_data[-1]) if self.u_data else "—")
+        self.valtxt_up.set_text(str(self.up_data[-1]) if self.up_data else "—")
+        self.valtxt_ui.set_text(str(self.ui_data[-1]) if self.ui_data else "—")
+        self.valtxt_ud.set_text(str(self.ud_data[-1]) if self.ud_data else "—")
         for ax in (self.ax_e, self.ax_u, self.ax_up, self.ax_ui, self.ax_ud):
             ax.relim()
             ax.autoscale_view()
