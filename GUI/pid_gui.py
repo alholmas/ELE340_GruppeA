@@ -345,19 +345,27 @@ class PIDGUI(ttk.Frame):
         if sp is None or not sp.is_open:
             return
 
-        FMT = "<BIHB"   # 1B header (0xAA), 4B tid_ms (uint32), 2B verdi (uint16), 1B tail (0x55)
+        FMT = "<BIHB"  # 1B header(0xAA), 4B tid_ms, 2B verdi, 1B tail(0x55)
 
         while not self._lesetraads_stop.is_set() and sp.is_open:
             try:
-                data = sp.read(8)
-                if len(data) != 8:
+                # Finn header (0xAA)
+                b = sp.read(1)
+                if not b or b[0] != 0xAA:
                     continue
 
+                # Les resterende 7 byte
+                rest = sp.read(7)
+                if len(rest) != 7:
+                    continue
+
+                data = b + rest
                 hdr, tid_ms, verdi, tlr = struct.unpack(FMT, data)
-                if hdr != 0xAA or tlr != 0x55:
+                if tlr != 0x55:
+                    # Feil tail -> forkast og let etter ny header
                     continue
 
-                # MCU-relativ tid med 32-bit wrap (tid_ms er 4 byte)
+                # 32-bit wrap på tid_ms (feltet er 4 byte)
                 if self._mcu_tid_forrige is None:
                     self._mcu_tid_forrige = tid_ms
                     self._mcu_tick_sum = 0
@@ -368,12 +376,14 @@ class PIDGUI(ttk.Frame):
                     self._mcu_tid_forrige = tid_ms
                     mcu_tid_s = self._mcu_tick_sum * self._sample_periode_s
 
+                # Logg
                 if self._logg_fil is not None:
                     try:
                         self._logg_fil.write(f"{mcu_tid_s:.3f},{int(verdi)}\n")
                     except Exception as le:
                         self.status_lbl.config(text=f"Loggfeil: {le}")
 
+                # Til GUI
                 self._lesetraads_kø.put((mcu_tid_s, int(verdi)))
 
             except Exception as e:
