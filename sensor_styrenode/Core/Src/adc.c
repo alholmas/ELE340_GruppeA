@@ -65,7 +65,8 @@ void ADC3_Init(void)
 }
 
 void ADC3_StartConversion_TRGO(void)
-{
+{ 
+  // Clear EOC flag
   LL_ADC_ClearFlag_EOC(ADC3);
   // Kalibrering av ADC
   LL_ADC_StartCalibration(ADC3, LL_ADC_SINGLE_ENDED);
