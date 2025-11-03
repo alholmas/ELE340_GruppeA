@@ -18,6 +18,8 @@
 /* RX buffer for DMA reception from sensor node (8-byte packets) */
 static uint8_t usart3_Rx_buf[8];
 static uint8_t usart2_Rx_buf[13];
+static uint64_t U = 0x004500A9010D0171;
+static uint16_t error = 0x01D5;
 // static volatile uint8_t usart2_Rx_buf[8];
 
 
@@ -60,7 +62,8 @@ void USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t 
       uint32_t tid = (uint32_t)buf[1] | ((uint32_t)buf[2] << 8) | ((uint32_t)buf[3] << 16) | ((uint32_t)buf[4] << 24);
       uint16_t mm = (uint16_t)buf[5] | ((uint16_t)buf[6] << 8);
       /* Sender data videre til PC */
-      USART_Transmit_Tid_Avstand(USART2, tid, mm);
+      // USART_Transmit_Tid_Avstand(USART2, tid, mm);
+      USART_Transmit_Tid_Avstand_Paadrag(USART2, tid, mm, error, U);
     }
 
     /* Restart DMA */
