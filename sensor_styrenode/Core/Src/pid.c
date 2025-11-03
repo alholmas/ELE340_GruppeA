@@ -27,6 +27,8 @@ typedef struct {
     float Kp;
     float Ti; /* integral time (s) */
     float Td; /* derivative time (s) */
+    float integrator_limit;
+    float setpoint;
 
     /* internal computed gains */
     float Ki; /* = Kp / Ti */
