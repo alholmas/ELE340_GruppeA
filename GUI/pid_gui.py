@@ -339,25 +339,32 @@ class PIDGUI(ttk.Frame):
         self.status_lbl.config(text="Status: frakoblet")
 
     def _les_loop(self):
+        import struct
+
         sp = getattr(self, "serieport", None)
         if sp is None or not sp.is_open:
             return
+
+        FMT = "<BIHB"   # 1B header (0xAA), 4B tid_ms (uint32), 2B verdi (uint16), 1B tail (0x55)
+
         while not self._lesetraads_stop.is_set() and sp.is_open:
             try:
-                data = sp.read()
-                HDR = 0xAA
-                TLR = 0x55
-                FMT = "<B I H B"
-                # Pakkeformat: <BIHB => header(1), tid_ms(4), avstand_mm(2), tail(1)
-                HDR, tid_ms, verdi, TLR = struct.unpack(FMT, data)
+                data = sp.read(8)
+                if len(data) != 8:
+                    continue
 
-                # MCU-relativ tid med 8-bit wrap
+                hdr, tid_ms, verdi, tlr = struct.unpack(FMT, data)
+                if hdr != 0xAA or tlr != 0x55:
+                    continue
+
+                # MCU-relativ tid med 32-bit wrap (tid_ms er 4 byte)
                 if self._mcu_tid_forrige is None:
                     self._mcu_tid_forrige = tid_ms
+                    self._mcu_tick_sum = 0
                     mcu_tid_s = 0.0
                 else:
-                    delta_ticks = (tid_ms - self._mcu_tid_forrige) & 0xFF
-                    self._mcu_tick_sum += int(delta_ticks)
+                    delta = (tid_ms - self._mcu_tid_forrige) & 0xFFFFFFFF
+                    self._mcu_tick_sum += int(delta)
                     self._mcu_tid_forrige = tid_ms
                     mcu_tid_s = self._mcu_tick_sum * self._sample_periode_s
 
