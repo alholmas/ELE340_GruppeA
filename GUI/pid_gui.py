@@ -243,7 +243,7 @@ class PIDGUI(ttk.Frame):
         self.akse.relim()
         self.akse.autoscale_view()
 
-        # Settpunkt – legges etter autoskala
+        # Settpunkt
         sp = self._parse_int(self.settpunkt_var.get())
         if sp is not None and self.t_data:
             self.linje_sp.set_data([self.t_data[0], self.t_data[-1]], [sp, sp])
@@ -303,7 +303,7 @@ class PIDGUI(ttk.Frame):
             messagebox.showerror("Loggfil-feil", f"Kunne ikke åpne loggfil: {e}")
             self._logg_fil = None
 
-        # Nullstill state for ny økt
+        # Start lesetråd
         self._lesetraads_stop.clear()
         self._mcu_tid_start = None
         self._lesetraad = threading.Thread(target=self._les_loop, name="les_serie", daemon=True)
@@ -347,7 +347,7 @@ class PIDGUI(ttk.Frame):
                 if tlr != 0x55:
                     continue
 
-                # Relativ tid i sekunder, wrap-sikker for uint32-ms
+                # Relativ tid i sekunder
                 if self._mcu_tid_start is None:
                     self._mcu_tid_start = tid_ms
                 delta_ms = (tid_ms - self._mcu_tid_start) & 0xFFFFFFFF
@@ -357,7 +357,7 @@ class PIDGUI(ttk.Frame):
                 if self._logg_fil is not None:
                     self._logg_fil.write(f"{mcu_tid_s},{int(verdi)}\n")
 
-                # Legg på GUI-kø (hovedtråd henter)
+                # Legg på GUI-kø
                 self._lesetraads_kø.put((mcu_tid_s, int(verdi)))
 
             except Exception as e:
