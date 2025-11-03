@@ -22,17 +22,18 @@ class PIDGUI(ttk.Frame):
         # Tilstandsvariabler (streng for robust validering)
         self.settpunkt_var = tk.StringVar(value="200")
         self.kp_var = tk.StringVar(value="200")
-        self.ki_var = tk.StringVar(value="0")
+        self.ki_var = tk.StringVar(value="0")     # Ti
         self.intbegr_var = tk.StringVar(value="10")
-        self.kd_var = tk.StringVar(value="2000")
+        self.kd_var = tk.StringVar(value="2000")  # Td
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
         self.serieport = None  # serial.Serial eller None
 
         # Data-buffere for plott
         self.max_punkt = 1000
-        self.t_data = deque(maxlen=self.max_punkt)   # tid [s]
-        self.pv_data = deque(maxlen=self.max_punkt)  # prosessverdi
+        self.t_data  = deque(maxlen=self.max_punkt)   # tid [s]
+        self.pv_data = deque(maxlen=self.max_punkt)   # prosessverdi
+        self.sp_data = deque(maxlen=self.max_punkt)   # settpunkt (tidsserie)
 
         # Eksterne callbacks (injiseres fra main)
         self._pid_callback = None
@@ -125,10 +126,9 @@ class PIDGUI(ttk.Frame):
 
         radkn = ttk.Frame(pidboks)
         radkn.pack(fill=tk.X, padx=8, pady=(6, 8))
-
-        ttk.Button(radkn, text="Start", command=lambda: self._bruk_pid(start=1)).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(radkn, text="Oppdater PID", command=lambda: self._bruk_pid(start=2)).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(radkn, text="Stop", command=lambda: (self._bruk_pid(start=0), self._nullstill_graf())).pack(side=tk.LEFT)
+        ttk.Button(radkn, text="Start",         command=lambda: self._bruk_pid(start=1)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(radkn, text="Oppdater PID",  command=lambda: self._bruk_pid(start=2)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(radkn, text="Stop",          command=lambda: (self._bruk_pid(start=0), self._nullstill_graf())).pack(side=tk.LEFT)
 
         # Info-linje
         self.info_lbl = ttk.Label(venstre, text="Avstand: —")
@@ -142,9 +142,9 @@ class PIDGUI(ttk.Frame):
         self.akse.set_ylabel("Avstand")
         self.akse.grid(True, alpha=0.25)
 
-        # Linjer
-        self.linje_pv, = self.akse.plot([], [], label="Avstand")
-        self.linje_sp, = self.akse.plot([], [], linestyle="--", label="Settpunkt")
+        # Linjer (PV og SP begge som tidsserier)
+        self.linje_pv, = self.akse.plot([], [], label="Avstand (PV)")
+        self.linje_sp, = self.akse.plot([], [], linestyle="--", label="Settpunkt (SP)")
         self.akse.legend(loc="upper left", framealpha=0.2, borderaxespad=0.5, fontsize=9)
 
         # Tving vekk vitenskapelig notasjon og offset på X
@@ -208,10 +208,11 @@ class PIDGUI(ttk.Frame):
     # ---------- Hovedhandlinger ----------
 
     def _bruk_pid(self, start):
+        # Hent verdier fra UI
         sp  = self._parse_int(self.settpunkt_var.get())
         kp  = self._parse_int(self.kp_var.get())
-        ti  = self._parse_int(self.ki_var.get()) 
-        td  = self._parse_int(self.kd_var.get())
+        ti  = self._parse_int(self.ki_var.get())   # "Ti" i UI
+        td  = self._parse_int(self.kd_var.get())   # "Td" i UI
         ib  = self._parse_int(self.intbegr_var.get())
         if None in (sp, kp, ti, td, ib):
             messagebox.showwarning("Ugyldig verdi", "SP/Kp/Ti/Td/IntBegr må være heltall.")
@@ -227,29 +228,28 @@ class PIDGUI(ttk.Frame):
     def _nullstill_graf(self):
         self.t_data.clear()
         self.pv_data.clear()
+        self.sp_data.clear()
         self._oppdater_plott()
 
     def oppdater_data(self, tid_s, pv):
-        # Legg til nye data og oppdater plott
+        """Kalles fra GUI-tråd (via _tøm_kø_og_oppdater) for hvert ny målepunkt."""
         self.t_data.append(float(tid_s))
         self.pv_data.append(int(pv))
+
+        # Les gjeldende SP fra feltet og logg det som tidsserie (trappeform)
+        sp_now = self._parse_int(self.settpunkt_var.get())
+        self.sp_data.append(0 if sp_now is None else int(sp_now))
+
         self.info_lbl.config(text=f"Avstand: {int(pv)}")
         self._oppdater_plott()
 
     def _oppdater_plott(self):
-        # PV-data
+        # Tegn PV og SP som tidsserier
         self.linje_pv.set_data(self.t_data, self.pv_data)
+        self.linje_sp.set_data(self.t_data, self.sp_data)
 
-        # Ekskluder SP fra autoskala
-        self.linje_sp.set_data([], [])
         self.akse.relim()
         self.akse.autoscale_view()
-
-        # Settpunkt
-        sp = self._parse_int(self.settpunkt_var.get())
-        if sp is not None and self.t_data:
-            self.linje_sp.set_data([self.t_data[0], self.t_data[-1]], [sp, sp])
-
         self.canvas.draw_idle()
 
     # ---------- Tilkobling / port / tråd ----------
@@ -301,6 +301,7 @@ class PIDGUI(ttk.Frame):
         try:
             filnavn = (self.filnavn_var.get() or "").strip() or "logg.txt"
             self._logg_fil = open(filnavn, "a", buffering=1, encoding="utf-8")
+            self._logg_fil.write("tid_s,pv,sp\n")
         except Exception as e:
             messagebox.showerror("Loggfil-feil", f"Kunne ikke åpne loggfil: {e}")
             self._logg_fil = None
@@ -330,7 +331,9 @@ class PIDGUI(ttk.Frame):
         sp = self.serieport
         if sp is None or not sp.is_open:
             return
-        
+
+        # Innkommende pakke (MCU -> PC): <B I H B>  = 1 + 4 + 2 + 1 = 8 byte
+        # header(0xAA), tid_ms(uint32), verdi(uint16), tail(0x55)
         PAKKE = struct.Struct("<BIHB")
 
         while not self._lesetraads_stop.is_set() and sp.is_open:
@@ -349,17 +352,19 @@ class PIDGUI(ttk.Frame):
                 if tlr != 0x55:
                     continue
 
-                # Relativ tid i sekunder
+                # Relativ tid i sekunder (bytt til /1000.0 hvis MCU gir millisekund)
                 if self._mcu_tid_start is None:
                     self._mcu_tid_start = tid_ms
                 delta_ms = (tid_ms - self._mcu_tid_start) & 0xFFFFFFFF
-                mcu_tid_s = delta_ms / 100  
+                mcu_tid_s = delta_ms / 100.0
 
-                # Logg til fil
+                # Logg til fil: tid, PV, SP (SP fra nåværende UI-verdi)
                 if self._logg_fil is not None:
-                    self._logg_fil.write(f"{mcu_tid_s},{int(verdi)}\n")
+                    sp_now = self._parse_int(self.settpunkt_var.get())
+                    sp_now = 0 if sp_now is None else int(sp_now)
+                    self._logg_fil.write(f"{mcu_tid_s},{int(verdi)},{sp_now}\n")
 
-                # Legg på GUI-kø
+                # Legg på GUI-kø (tid, PV) – SP hentes i oppdater_data()
                 self._lesetraads_kø.put((mcu_tid_s, int(verdi)))
 
             except Exception as e:
