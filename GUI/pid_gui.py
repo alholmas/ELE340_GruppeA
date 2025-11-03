@@ -339,64 +339,57 @@ class PIDGUI(ttk.Frame):
         self.status_lbl.config(text="Status: frakoblet")
 
     def _les_loop(self):
-        import struct
-
         sp = getattr(self, "serieport", None)
         if sp is None or not sp.is_open:
             return
 
-        FMT = "<BIHB"  # 1B header(0xAA), 4B tid_ms, 2B verdi, 1B tail(0x55)
+        # Big-endian: 1B header, 4B tid_ms, 2B verdi, 1B tail
+        PAKKE = struct.Struct(">BIHB")
 
         while not self._lesetraads_stop.is_set() and sp.is_open:
             try:
-                # Finn header (0xAA)
+                # Finn header 0xAA
                 b = sp.read(1)
                 if not b or b[0] != 0xAA:
                     continue
 
-                # Les resterende 7 byte
-                rest = sp.read(7)
-                if len(rest) != 7:
+                # Les resten av pakken
+                rest = sp.read(PAKKE.size - 1)  # 7 byte
+                if len(rest) != PAKKE.size - 1:
                     continue
 
-                data = b + rest
-                hdr, tid_ms, verdi, tlr = struct.unpack(FMT, data)
+                hdr, tid_ms, verdi, tlr = PAKKE.unpack(b + rest)
                 if tlr != 0x55:
-                    # Feil tail -> forkast og let etter ny header
                     continue
 
-                # 32-bit wrap på tid_ms (feltet er 4 byte)
-                if self._mcu_tid_forrige is None:
-                    self._mcu_tid_forrige = tid_ms
-                    self._mcu_tick_sum = 0
-                    mcu_tid_s = 0.0
-                else:
-                    delta = (tid_ms - self._mcu_tid_forrige) & 0xFFFFFFFF
-                    self._mcu_tick_sum += int(delta)
-                    self._mcu_tid_forrige = tid_ms
-                    mcu_tid_s = self._mcu_tick_sum * self._sample_periode_s
+                # ms -> sek relativt til første pakke (wrap-sikker)
+                if self._mcu_tid_start is None:
+                    self._mcu_tid_start = tid_ms
+                delta_ms = (tid_ms - self._mcu_tid_start) & 0xFFFFFFFF
+                mcu_tid_s = delta_ms / 1000.0
 
                 # Logg
                 if self._logg_fil is not None:
                     try:
                         self._logg_fil.write(f"{mcu_tid_s:.3f},{int(verdi)}\n")
                     except Exception as le:
-                        self.status_lbl.config(text=f"Loggfeil: {le}")
+                        # unngå Tk i tråd: bruk status-kø (eller self.after)
+                        self._status_kø.put(f"Loggfeil: {le}")
 
-                # Til GUI
+                # Til GUI (hovedtråd tømmer køen)
                 self._lesetraads_kø.put((mcu_tid_s, int(verdi)))
 
             except Exception as e:
-                self.status_lbl.config(text=f"Lesefeil: {e}")
+                # unngå Tk i tråd
+                self._status_kø.put(f"Lesefeil: {e}")
                 try:
                     if sp and sp.is_open:
                         sp.close()
                 except Exception:
                     pass
                 self.serieport = None
-                self._tilkoblet = False
-                self.koble_knapp.config(text="Koble til")
                 break
+
 
     def _tøm_kø_og_oppdater(self):
         try:
