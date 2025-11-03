@@ -210,9 +210,9 @@ class PIDGUI(ttk.Frame):
     def _bruk_pid(self, start):
         sp  = self._parse_int(self.settpunkt_var.get())
         kp  = self._parse_int(self.kp_var.get())
-        ti  = self._parse_int(self.ki_var.get())       # "Ti" i UI
-        td  = self._parse_int(self.kd_var.get())       # "Td" i UI
-        ib  = self._parse_int(self.intbegr_var.get())  # integrator-begr.
+        ti  = self._parse_int(self.ki_var.get()) 
+        td  = self._parse_int(self.kd_var.get())
+        ib  = self._parse_int(self.intbegr_var.get())
         if None in (sp, kp, ti, td, ib):
             messagebox.showwarning("Ugyldig verdi", "SP/Kp/Ti/Td/IntBegr må være heltall.")
             return
@@ -331,7 +331,7 @@ class PIDGUI(ttk.Frame):
         if sp is None or not sp.is_open:
             return
         
-        PAKKE = struct.Struct(">BIHB")
+        PAKKE = struct.Struct("<BIHB")
 
         while not self._lesetraads_stop.is_set() and sp.is_open:
             try:

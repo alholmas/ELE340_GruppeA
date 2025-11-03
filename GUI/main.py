@@ -53,24 +53,12 @@ def main():
             return
 
         try:
-            pkt = struct.pack(
-                "<BBHHHHHB",
-                HEADER,
-                int(start),
-                int(kp),
-                int(ti)   & 0xFFFF,
-                int(td),
-                int(intbegr) & 0xFFFF,
-                int(settpunkt_mm) & 0xFFFF, 
-                TAIL
-            )
+            pkt = struct.pack("<BBHHHHHB", HEADER, start, kp, ti, td, intbegr, settpunkt_mm, TAIL)
             sp.write(pkt)
-            print(
-                f"Sendt pakke (len={len(pkt)}): "
-                f"H=0x{HEADER:02X}, Start={int(start)}, "
-                f"Kp={int(kp)}, Ti={int(ti)}, Td={int(td)}, IntB={int(intbegr)}, SP={int(settpunkt_mm)}, "
-                f"Tail=0x{TAIL:02X}"
-            )
+            print(f"Sendt pakke (len={len(pkt)}): "
+                f"H=0x{HEADER:02X}, Start={start}, "
+                f"Kp={kp}, Ti={ti}, Td={td}, IntB={intbegr}, SP={settpunkt_mm}, "
+                f"Tail=0x{TAIL:02X}")
         except Exception as e:
             messagebox.showerror("Sendefeil", f"Kunne ikke sende PID-verdier: {e}")
 
