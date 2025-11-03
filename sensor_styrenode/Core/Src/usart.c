@@ -302,6 +302,16 @@ void USART_TC_Handler(USART_TypeDef *USARTx)
 //   }
 // }
 
+void USART_Transmit_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte)
+{
+  uint8_t dataBuffer[3];
+  dataBuffer[0] = 0xAA;                       // Header startbyte
+  dataBuffer[1] = start_stop_byte;            // Start/Stop byte
+  dataBuffer[2] = 0x55;                       // Footer endbyte
+
+  (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+}
+
 void USART_Transmit_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand)
 {
   uint8_t dataBuffer[8];
@@ -318,20 +328,9 @@ void USART_Transmit_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mm
   (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
-void USART_Transmit_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte)
+void USART_Transmit_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t error, uint64_t U)
 {
-  uint8_t dataBuffer[3];
-  dataBuffer[0] = 0xAA;                       // Header startbyte
-  dataBuffer[1] = start_stop_byte;            // Start/Stop byte
-  dataBuffer[2] = 0x55;                       // Footer endbyte
-
-  (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
-}
-
-
-void USART_Transmit_Tid_Avstand_Avik(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t mmAvik)
-{
-  uint8_t dataBuffer[10];
+  uint8_t dataBuffer[18];
   dataBuffer[0] = 0xAA;                       // Header startbyte
   dataBuffer[1] = tid & 0xFF;                 // Least significant byte av tid (little-endian)
   dataBuffer[2] = (tid >> 8) & 0xFF;
@@ -339,15 +338,20 @@ void USART_Transmit_Tid_Avstand_Avik(USART_TypeDef *USARTx, uint32_t tid, uint16
   dataBuffer[4] = (tid >> 24) & 0xFF;         // Most significant byte av tid
   dataBuffer[5] = mmAvstand & 0xFF;           // Least significant byte av mmAvstand (little-endian)
   dataBuffer[6] = (mmAvstand >> 8) & 0xFF;    // Most significant byte av mmAvstand
-  dataBuffer[7] = mmAvik & 0xFF;              // Least significant byte av mmAvik (little-endian)
-  dataBuffer[8] = (mmAvik >> 8) & 0xFF;       // Most significant byte av mmAvik
-  dataBuffer[9] = 0x55;                       // Footer endbyte
+  dataBuffer[7] = error & 0xFF;               // Least significant byte av error (little-endian)
+  dataBuffer[8] = (error >> 8) & 0xFF;        // Most significant byte av error
+  dataBuffer[9] = U & 0xFF;                   // Least significant byte av U (little-endian)
+  dataBuffer[10] = (U >> 8) & 0xFF;
+  dataBuffer[11] = (U >> 16) & 0xFF;
+  dataBuffer[12] = (U >> 24) & 0xFF;
+  dataBuffer[13] = (U >> 32) & 0xFF;
+  dataBuffer[14] = (U >> 40) & 0xFF;
+  dataBuffer[15] = (U >> 48) & 0xFF;
+  dataBuffer[16] = (U >> 56) & 0xFF;          // Most significant byte av U
+  dataBuffer[17] = 0x55;                       // Footer endbyte
 
   (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
-
-
-
 
 
 void __attribute__((weak)) USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
