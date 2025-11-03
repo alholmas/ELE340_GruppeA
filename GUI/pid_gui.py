@@ -6,6 +6,7 @@ import threading
 import struct
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from matplotlib.ticker import MultipleLocator, ScalarFormatter
 import serial.tools.list_ports
 
 
@@ -20,7 +21,7 @@ class PIDGUI(ttk.Frame):
         # Tema
         self._sett_tema()
 
-        # Tilstandsvariabler
+        # Tilstandsvariabler (streng for robust validering)
         self.settpunkt_var = tk.StringVar(value="200")
         self.kp_var = tk.StringVar(value="200")
         self.ki_var = tk.StringVar(value="0")
@@ -28,7 +29,7 @@ class PIDGUI(ttk.Frame):
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
         self._tilkoblet = False
-        self.serieport = None  # serieport-objekt settes av tilkoblingshandler
+        self.serieport = None
 
         # Data-buffere for plott
         self.max_punkt = 2000
@@ -48,10 +49,8 @@ class PIDGUI(ttk.Frame):
         # Loggfilhåndtak
         self._logg_fil = None
 
-        # MCU-tidsrekonstruksjon (uint8 teller @ 100 Hz)
-        self._mcu_tid_forrige = None
-        self._mcu_tick_sum = 0
-        self._sample_periode_s = 0.01  # 10 ms/pakke
+        # MCU-tidsrekonstruksjon
+        self._mcu_tid_start = None  # 32-bit ms teller ved første pakke
 
         # Bygg UI
         self._bygg_layout()
@@ -141,9 +140,18 @@ class PIDGUI(ttk.Frame):
         self.akse.set_xlabel("Tid [s]")
         self.akse.set_ylabel("Avstand")
         self.akse.grid(True, alpha=0.25)
+
+        # Linjer
         self.linje_pv, = self.akse.plot([], [], label="Avstand")
         self.linje_sp, = self.akse.plot([], [], linestyle="--", label="Settpunkt")
         self.akse.legend(loc="upper left", framealpha=0.2, borderaxespad=0.5, fontsize=9)
+
+        # Tving vekk vitenskapelig notasjon og offset på X
+        self.akse.ticklabel_format(axis="x", style="plain", useOffset=False)
+        self.akse.xaxis.set_major_formatter(ScalarFormatter(useOffset=False, useMathText=False))
+
+        # Sett tikk hver 1 ms (1s)
+        self.akse.xaxis.set_major_locator(MultipleLocator(1.s))
 
         self.canvas = FigureCanvasTkAgg(figur, master=hoyre)
         self.canvas.draw()
@@ -315,9 +323,9 @@ class PIDGUI(ttk.Frame):
             messagebox.showerror("Loggfil-feil", f"Kunne ikke åpne loggfil: {e}")
             self._logg_fil = None
 
+        # Nullstill state for ny økt
         self._lesetraads_stop.clear()
-        self._mcu_tid_forrige = None
-        self._mcu_tick_sum = 0
+        self._mcu_tid_start = None
         self._lesetraad = threading.Thread(target=self._les_loop, name="les_serie", daemon=True)
         self._lesetraad.start()
 
@@ -343,7 +351,7 @@ class PIDGUI(ttk.Frame):
         if sp is None or not sp.is_open:
             return
 
-        # Big-endian: 1B header, 4B tid_ms, 2B verdi, 1B tail
+        # Big-endian: 1B header, 4B tid_ms (uint32), 2B verdi (uint16), 1B tail
         PAKKE = struct.Struct(">BIHB")
 
         while not self._lesetraads_stop.is_set() and sp.is_open:
@@ -353,8 +361,8 @@ class PIDGUI(ttk.Frame):
                 if not b or b[0] != 0xAA:
                     continue
 
-                # Les resten av pakken
-                rest = sp.read(PAKKE.size - 1)  # 7 byte
+                # Les resten av pakken (7 byte)
+                rest = sp.read(PAKKE.size - 1)
                 if len(rest) != PAKKE.size - 1:
                     continue
 
@@ -362,25 +370,23 @@ class PIDGUI(ttk.Frame):
                 if tlr != 0x55:
                     continue
 
-                # ms -> sek relativt til første pakke (wrap-sikker)
+                # Relativ tid i sekunder, wrap-sikker for uint32-ms
                 if self._mcu_tid_start is None:
                     self._mcu_tid_start = tid_ms
                 delta_ms = (tid_ms - self._mcu_tid_start) & 0xFFFFFFFF
                 mcu_tid_s = delta_ms / 1000.0
 
-                # Logg
+                # Logg til fil
                 if self._logg_fil is not None:
                     try:
                         self._logg_fil.write(f"{mcu_tid_s:.3f},{int(verdi)}\n")
                     except Exception as le:
-                        # unngå Tk i tråd: bruk status-kø (eller self.after)
                         self._status_kø.put(f"Loggfeil: {le}")
 
-                # Til GUI (hovedtråd tømmer køen)
+                # Legg på GUI-kø (hovedtråd henter)
                 self._lesetraads_kø.put((mcu_tid_s, int(verdi)))
 
             except Exception as e:
-                # unngå Tk i tråd
                 self._status_kø.put(f"Lesefeil: {e}")
                 try:
                     if sp and sp.is_open:
@@ -390,14 +396,16 @@ class PIDGUI(ttk.Frame):
                 self.serieport = None
                 break
 
-
     def _tøm_kø_og_oppdater(self):
+        # Tøm datakø
         try:
             while True:
                 tid_s, pv = self._lesetraads_kø.get_nowait()
                 self.oppdater_data(tid_s, pv)
         except queue.Empty:
             pass
+
+        # Neste poll
         self.after(33, self._tøm_kø_og_oppdater)
 
     def lukk(self):
