@@ -20,7 +20,6 @@
 static volatile uint32_t tid = 0;
 static volatile uint16_t adc_mV = 0;
 static volatile uint16_t avsand_mm = 0;
-static volatile uint32_t adc_eoc_count = 0;
 /* Private function prototypes -----------------------------------------------*/
 
 
@@ -85,8 +84,7 @@ uint16_t konverter_mm(uint16_t adc_mV)
 void ADC3_EndOfConversion_Callback(void)
 {
   tid++;
-  adc_eoc_count++;
-  
+
   // Les ADC-DR (vanligvis clear'er dette EOC)
   adc_mV = (uint16_t)LL_ADC_REG_ReadConversionData12(ADC3);
   avsand_mm = konverter_mm(adc_mV);
@@ -94,9 +92,4 @@ void ADC3_EndOfConversion_Callback(void)
 
   // Send data via USART3
   USART_Transmit_Tid_Avstand(USART3, tid, avsand_mm);
-
-  /* Debug: toggle LED3 every 50 callbacks so we can visually/logic-check EOC */
-  if ((adc_eoc_count % 50) == 0) {
-    LL_GPIO_TogglePin(LED3_GPIO_PORT, LED3_PIN);
-  }
 }

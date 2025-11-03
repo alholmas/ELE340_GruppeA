@@ -39,8 +39,6 @@ void TIM3_Init(void)
   LL_TIM_SetTriggerOutput(TIM3, LL_TIM_TRGO_RESET);
   LL_TIM_DisableMasterSlaveMode(TIM3);
 
-  /* Enable the compare channel so the OC output appears on the pin */
-  LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH1);
 
   LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB);
     /**TIM3 GPIO Configuration

@@ -23,9 +23,7 @@ static uint8_t usart3_Rx_buf[8];
 void StyreNode_Init(void)
 {
   /* Initialisering av perifere enheter for sensorNode ----------------*/
-  TIM4_Init();
-  TIM7_Init();
-  ADC3_Init();
+  TIM3_Init();
   USART2_Init();
   USART3_Init();
   GPIO_Init();
@@ -42,11 +40,11 @@ void StyreNode_Init(void)
 
 void StyreNode_Loop(void)
 {
-	//   for (int i = 0; i < 100; i++)
-  // {
-  //   (void)TIM3_SetFrequencyHz(10000 + i * 10);
-  //   LL_mDelay(500);
-  // }
+	  for (int i = 0; i < 100; i++)
+  {
+    (void)TIM3_SetFrequencyHz(10000 + i * 100);
+    LL_mDelay(500);
+  }
 }
 /* SensorNode spesifikke funksjoner -------------------------------------*/
 
