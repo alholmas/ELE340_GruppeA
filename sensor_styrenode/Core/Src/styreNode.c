@@ -82,8 +82,10 @@ void USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t 
         LL_GPIO_TogglePin(LED3_GPIO_PORT, LED3_PIN);
       } else if (start_stop_byte == 0x00) {
         USART_Transmit_Start_Stop(USART2, 0x00);
+        LL_GPIO_TogglePin(LED3_GPIO_PORT, LED3_PIN);
       } else if (start_stop_byte == 0x02 || start_stop_byte == 0x01) {
         /* Oppdater parametere (bruk variablene som trengs) */
+        LL_GPIO_TogglePin(LED10_GPIO_PORT, LED10_PIN);
         (void)Kp; (void)Ti; (void)Td; (void)integrator_limit; (void)setpoint;
       }
       /* Restart DMA */
