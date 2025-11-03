@@ -61,7 +61,7 @@ class PIDGUI(ttk.Frame):
         self.port_cb.bind("<<ComboboxDropdown>>", lambda e: self._oppdater_porter())
 
         # Start periodisk tømming av kø (≈ 30 Hz)
-        self.after(33, self._tøm_kø_og_oppdater)
+        self.after(50, self._tøm_kø_og_oppdater)
 
     # ---------- Tema / layout ----------
 
@@ -344,21 +344,21 @@ class PIDGUI(ttk.Frame):
             return
         while not self._lesetraads_stop.is_set() and sp.is_open:
             try:
-                data = sp.read(3)
-                if len(data) != 3:
-                    continue
-
-                # Pakkeformat: <Bh  =>  tid:uint8, verdi:int16 (LE)
-                tid8, verdi = struct.unpack("<Bh", data)
+                data = sp.read()
+                HDR = 0xAA
+                TLR = 0x55
+                FMT = "<B I H B"
+                # Pakkeformat: <BIHB => header(1), tid_ms(4), avstand_mm(2), tail(1)
+                HDR, tid_ms, verdi, TLR = struct.unpack(FMT, data)
 
                 # MCU-relativ tid med 8-bit wrap
                 if self._mcu_tid_forrige is None:
-                    self._mcu_tid_forrige = tid8
+                    self._mcu_tid_forrige = tid_ms
                     mcu_tid_s = 0.0
                 else:
-                    delta_ticks = (tid8 - self._mcu_tid_forrige) & 0xFF
+                    delta_ticks = (tid_ms - self._mcu_tid_forrige) & 0xFF
                     self._mcu_tick_sum += int(delta_ticks)
-                    self._mcu_tid_forrige = tid8
+                    self._mcu_tid_forrige = tid_ms
                     mcu_tid_s = self._mcu_tick_sum * self._sample_periode_s
 
                 if self._logg_fil is not None:

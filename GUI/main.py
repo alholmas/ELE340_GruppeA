@@ -56,7 +56,7 @@ def main():
             return
         try:
             # Header i MSB (69) + 24-bit payload for settpunkt
-            header = 69
+            header = 0xFF
             sp_encoded = ((header & 0xFF) << 24) | (int(settpunkt) & 0xFFFFFF)
             pkt = struct.pack("<iiii", sp_encoded, int(kp), int(ki), int(kd))
             sp.write(pkt)
