@@ -7,12 +7,15 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-/* Init ADC ----------------------------------------------------------------*/
+/* Init ADC ------------------------------------------------------------------*/
 void ADC3_Init(void);
 
 /* Metoder for ADC ------------------------------------------------------------*/
-void ADC3_StartConversion(void); 
-void ADC3_StopConversion(void);
+void ADC3_StartConversion_TRGO(void);
+void ADC3_StopConversion_TRGO(void);
+
+
+/* Callbacks ------------------------------------------------------------------*/
 void ADC3_EndOfConversion_Callback();
 
 #ifdef __cplusplus

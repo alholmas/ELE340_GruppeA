@@ -12,10 +12,10 @@ void TIM4_Init(void);
 void TIM7_Init(void);
 
 /* Metoder for TIM ------------------------------------------------------------*/
-void TIM4_Start(void);
-void TIM4_Stopp(void);
-void TIM7_Start(void);
-void TIM7_Stopp(void);
+void TIM4_Start_PWM(void);
+void TIM4_Stopp_PWM(void);
+void TIM7_Start_TRGO(void);
+void TIM7_Stopp_TRGO(void);
 
 
 #ifdef __cplusplus
