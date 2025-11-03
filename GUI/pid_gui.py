@@ -13,7 +13,7 @@ class PIDGUI(ttk.Frame):
     def __init__(self, master):
         super().__init__(master)
         self.master.title("PID styring av avstandssensor")
-        self.master.geometry("1400x600")
+        self.master.geometry("1400x1000")
         self.master.minsize(820, 520)
 
         # Tema
@@ -93,12 +93,13 @@ class PIDGUI(ttk.Frame):
         return ttk.LabelFrame(parent, text=tittel) if tittel else ttk.Frame(parent)
 
     def _bygg_layout(self):
-        # Hovedrammer
-        hoved = self._ramme(self.master)
-        hoved.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 12), pady=12)
-
+        # VIKTIG: pakk venstre panel FØRST, så ender panelet lengst til venstre
         venstre_panel = self._ramme(self.master)
         venstre_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(12, 8), pady=12)
+
+        # Hovedområde for figurer (stort plott + fem små til høyre)
+        hoved = self._ramme(self.master)
+        hoved.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 12), pady=12)
 
         # --- Venstre kontrollpanel ---
         ttk.Label(venstre_panel, text="Avstandssensor", font=("Segoe UI", 14, "bold")).pack(
@@ -143,31 +144,36 @@ class PIDGUI(ttk.Frame):
         self.info_lbl = ttk.Label(venstre_panel, text="Avstand: —")
         self.info_lbl.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(6, 0))
 
-        # --- Venstre figur (PV/SP) ---
+        # --- Stort plott (PV/SP) ---
         venstre_fig_frame = ttk.Frame(hoved)
         venstre_fig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
 
-        figur = Figure(figsize=(6, 4), dpi=100)
+        figur = Figure(figsize=(7.5, 6), dpi=100)  # litt bredere for å være "stort"
         self.akse = figur.add_subplot(111)
         self.akse.set_title("Avstandsmåling")
         self.akse.set_xlabel("Tid [s]")
         self.akse.set_ylabel("Avstand [mm]")
         self.akse.grid(True, alpha=0.25)
 
-        self.linje_pv, = self.akse.plot([], [], label="Avstand (PV)")
-        self.linje_sp, = self.akse.plot([], [], linestyle="--", label="Settpunkt (SP)")
+        # Tykkere linjer for tydelig hovedplott
+        self.linje_pv, = self.akse.plot([], [], label="Avstand (PV)", linewidth=1.6)
+        self.linje_sp, = self.akse.plot([], [], linestyle="--", label="Settpunkt (SP)", linewidth=1.4)
         self.akse.legend(loc="upper left", framealpha=0.2, borderaxespad=0.5, fontsize=9)
         self.akse.ticklabel_format(axis="x", style="plain", useOffset=False)
 
         self.canvas = FigureCanvasTkAgg(figur, master=venstre_fig_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-        # --- Høyre figur (5 plott) ---
+        # --- Fem plott i høyre kolonne ---
         høyre_fig_frame = ttk.Frame(hoved)
         høyre_fig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(8, 0))
+        høyre_fig_frame.update_idletasks()
+        # Lås en fornuftig bredde for å sikre smal høyrekolonne
+        høyre_fig_frame.configure(width=480)
+        høyre_fig_frame.pack_propagate(False)
 
-        figur5 = Figure(figsize=(4, 4), dpi=100)
-        gs = figur5.add_gridspec(5, 1, hspace=0.35)
+        figur5 = Figure(figsize=(4.8, 9.2), dpi=100)  # smal og høy
+        gs = figur5.add_gridspec(5, 1, hspace=0.55)   # MER LUFT mellom de fem
 
         self.ax_e  = figur5.add_subplot(gs[0, 0])
         self.ax_u  = figur5.add_subplot(gs[1, 0], sharex=self.ax_e)
@@ -182,15 +188,19 @@ class PIDGUI(ttk.Frame):
         self.ax_ud.set_title("D-del")
         self.ax_ud.set_xlabel("Tid [s]")
 
-        for ax in (self.ax_e, self.ax_u, self.ax_up, self.ax_ui, self.ax_ud):
+        # Grid + ryddige akser
+        for i, ax in enumerate((self.ax_e, self.ax_u, self.ax_up, self.ax_ui, self.ax_ud)):
             ax.grid(True, alpha=0.25)
             ax.ticklabel_format(axis="x", style="plain", useOffset=False)
+            if i < 4:
+                # Skjul x-etiketter for de øverste 4 for å spare plass
+                ax.label_outer()
 
-        self.linje_e,  = self.ax_e.plot([], [])
-        self.linje_u,  = self.ax_u.plot([], [])
-        self.linje_up, = self.ax_up.plot([], [])
-        self.linje_ui, = self.ax_ui.plot([], [])
-        self.linje_ud, = self.ax_ud.plot([], [])
+        self.linje_e,  = self.ax_e.plot([], [], linewidth=1.2)
+        self.linje_u,  = self.ax_u.plot([], [], linewidth=1.2)
+        self.linje_up, = self.ax_up.plot([], [], linewidth=1.2)
+        self.linje_ui, = self.ax_ui.plot([], [], linewidth=1.2)
+        self.linje_ud, = self.ax_ud.plot([], [], linewidth=1.2)
 
         self.canvas5 = FigureCanvasTkAgg(figur5, master=høyre_fig_frame)
         self.canvas5.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -298,14 +308,14 @@ class PIDGUI(ttk.Frame):
         self._oppdater_plott()
 
     def _oppdater_plott(self):
-        # Venstre
+        # Venstre (stort plott)
         self.linje_pv.set_data(self.t_data, self.pv_data)
         self.linje_sp.set_data(self.t_data, self.sp_data)
         self.akse.relim()
         self.akse.autoscale_view()
         self.canvas.draw_idle()
 
-        # Høyre
+        # Høyre (5 plott)
         self.linje_e.set_data(self.t_data, self.err_data)
         self.linje_u.set_data(self.t_data, self.u_data)
         self.linje_up.set_data(self.t_data, self.up_data)
@@ -414,11 +424,11 @@ class PIDGUI(ttk.Frame):
                 if tlr != 0x55:
                     continue
 
-                # Relativ tid i sekunder (antatt tid_raw i millisekund)
+                # Relativ tid i sekunder (antatt tid_raw i 10 ms ticks -> /100)
                 if self._mcu_tid_start is None:
                     self._mcu_tid_start = tid_raw
                 delta = (tid_raw - self._mcu_tid_start) & 0xFFFFFFFF
-                tid_s = delta / 100  # endre til /100.0 hvis styrenode bruker 10ms-ticks
+                tid_s = delta / 100.0  # 10 ms per tick
 
                 # Logg til fil: tid, PV, SP, e, u, up, ui, ud
                 if self._logg_fil is not None:
