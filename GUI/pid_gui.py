@@ -6,7 +6,6 @@ import threading
 import struct
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-from matplotlib.ticker import MultipleLocator, ScalarFormatter
 import serial.tools.list_ports
 
 
@@ -16,7 +15,6 @@ class PIDGUI(ttk.Frame):
         self.master.title("PID styring av avstandssensor")
         self.master.geometry("1400x600")
         self.master.minsize(820, 520)
-        self.master.protocol("WM_DELETE_WINDOW", self.lukk)
 
         # Tema
         self._sett_tema()
@@ -28,8 +26,7 @@ class PIDGUI(ttk.Frame):
         self.kd_var = tk.StringVar(value="2000")
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
-        self._tilkoblet = False
-        self.serieport = None
+        self.serieport = None  # serial.Serial eller None
 
         # Data-buffere for plott
         self.max_punkt = 1000
@@ -50,7 +47,7 @@ class PIDGUI(ttk.Frame):
         self._logg_fil = None
 
         # MCU-tidsrekonstruksjon
-        self._mcu_tid_start = None  # 32-bit ms teller ved første pakke
+        self._mcu_tid_start = None  # første MCU-tid i ms
 
         # Bygg UI
         self._bygg_layout()
@@ -59,7 +56,7 @@ class PIDGUI(ttk.Frame):
         self._oppdater_porter()
         self.port_cb.bind("<<ComboboxDropdown>>", lambda e: self._oppdater_porter())
 
-        # Start periodisk tømming av kø (≈ 30 Hz)
+        # Start periodisk tømming av kø
         self.after(50, self._tøm_kø_og_oppdater)
 
     # ---------- Tema / layout ----------
@@ -121,8 +118,8 @@ class PIDGUI(ttk.Frame):
         pidboks.pack(fill=tk.X, padx=0, pady=(0, 10))
         self._rad_med_entry(pidboks, "Settpunkt", self.settpunkt_var)
         self._rad_med_entry(pidboks, "Kp", self.kp_var)
-        self._rad_med_entry(pidboks, "Ki", self.ki_var)
-        self._rad_med_entry(pidboks, "Kd", self.kd_var)
+        self._rad_med_entry(pidboks, "Ti", self.ki_var)
+        self._rad_med_entry(pidboks, "Td", self.kd_var)
 
         radkn = ttk.Frame(pidboks)
         radkn.pack(fill=tk.X, padx=8, pady=(6, 8))
@@ -148,12 +145,8 @@ class PIDGUI(ttk.Frame):
 
         # Tving vekk vitenskapelig notasjon og offset på X
         self.akse.ticklabel_format(axis="x", style="plain", useOffset=False)
-        self.akse.xaxis.set_major_formatter(ScalarFormatter(useOffset=False, useMathText=False))
-
-       
 
         self.canvas = FigureCanvasTkAgg(figur, master=hoyre)
-        self.canvas.draw()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def _rad_med_entry(self, parent, etikett, var):
@@ -176,6 +169,22 @@ class PIDGUI(ttk.Frame):
         except ValueError:
             return None
 
+    def _trygg_lukk_port(self):
+        sp = self.serieport
+        if sp and sp.is_open:
+            try:
+                sp.close()
+            except Exception:
+                pass
+        self.serieport = None
+
+    def _oppdater_status_from_port(self):
+        apen = bool(self.serieport and self.serieport.is_open)
+        self.koble_knapp.config(text="Koble fra" if apen else "Koble til")
+        self.status_lbl.config(
+            text=f"Status: tilkoblet ({self.port_var.get().strip() or '<ukjent>'})" if apen else "Status: frakoblet"
+        )
+
     # ---------- Offentlig API ----------
 
     def registrer_pid_callback(self, funksjon):
@@ -195,7 +204,7 @@ class PIDGUI(ttk.Frame):
     # ---------- Hovedhandlinger ----------
 
     def _bruk_pid(self):
-        # Hent PID-verdier og kall callback (robust parsing)
+        # Hent PID-verdier og kall callback (parsing av heltall)
         sp = self._parse_int(self.settpunkt_var.get())
         kp = self._parse_int(self.kp_var.get())
         ki = self._parse_int(self.ki_var.get())
@@ -205,12 +214,11 @@ class PIDGUI(ttk.Frame):
             messagebox.showwarning("Ugyldig verdi", "Settpunkt/Kp/Ki/Kd må være heltall.")
             return
 
-        if not callable(self._pid_callback):
-            messagebox.showinfo("Ingen handler", "Ingen PID-handler registrert.")
-            return
-
         try:
-            self._pid_callback(sp, kp, ki, kd)
+            if callable(self._pid_callback):
+                self._pid_callback(sp, kp, ki, kd)
+            else:
+                messagebox.showinfo("Ingen handler", "Ingen PID-handler registrert.")
         except Exception as e:
             messagebox.showerror("Callback-feil", str(e))
 
@@ -227,32 +235,17 @@ class PIDGUI(ttk.Frame):
         self._oppdater_plott()
 
     def _oppdater_plott(self):
-        # Oppdater PV-kurve
+        # PV-data
         self.linje_pv.set_data(self.t_data, self.pv_data)
 
-        # Auto-akse X (unngå identisk xmin/xmax)
-        if len(self.t_data) >= 1:
-            xmin, xmax = self.t_data[0], self.t_data[-1]
-            if xmax <= xmin:
-                xmin, xmax = xmin - 1.0, xmin + 1.0
-            self.akse.set_xlim(xmin, xmax)
-        else:
-            self.akse.set_xlim(0, 1)
+        # Ekskluder SP fra autoskala
+        self.linje_sp.set_data([], [])
+        self.akse.relim()
+        self.akse.autoscale_view()
 
-        # Auto-akse Y
-        if self.pv_data:
-            y_min = min(self.pv_data)
-            y_max = max(self.pv_data)
-            margin = max(1, int(0.1 * (y_max - y_min + 1)))
-            self.akse.set_ylim(y_min - margin, y_max + margin)
-        else:
-            self.akse.set_ylim(-1, 1)
-
-        # Settpunktlinje – kun hvis gyldig tall
+        # Settpunkt – legges etter autoskala
         sp = self._parse_int(self.settpunkt_var.get())
-        if sp is None or not self.t_data:
-            self.linje_sp.set_data([], [])
-        else:
+        if sp is not None and self.t_data:
             self.linje_sp.set_data([self.t_data[0], self.t_data[-1]], [sp, sp])
 
         self.canvas.draw_idle()
@@ -266,29 +259,26 @@ class PIDGUI(ttk.Frame):
             messagebox.showerror("Portoppdatering feilet", str(e))
             porter = []
         self.port_cb["values"] = porter
+
         nåv = (self.port_var.get() or "").strip()
-        if nåv and nåv in porter:
-            pass
-        elif porter:
-            self.port_var.set(porter[0])
-        else:
-            self.port_var.set("")
+        if not (nåv and nåv in porter):
+            self.port_var.set(porter[0] if porter else "")
 
     def _toggle_tilkobling(self):
-        if not self._tilkoblet:
+        if not bool(self.serieport and self.serieport.is_open):
             # --- Koble til ---
             try:
                 if not callable(self._koble_til_fn):
                     raise RuntimeError("Tilkoblingshandler ikke satt.")
                 resultat = self._koble_til_fn(self.port_var.get())
-                if resultat is True and getattr(self, "serieport", None) and self.serieport.is_open:
-                    self._tilkoblet = True
+                if resultat is True and self.serieport and self.serieport.is_open:
+                    self._nullstill_graf()
                     self._start_logging()
                 else:
                     raise RuntimeError("Klarte ikke koble til.")
             except Exception as e:
                 messagebox.showerror("Tilkoblingsfeil", str(e))
-                self._tilkoblet = False
+                self._trygg_lukk_port()
         else:
             # --- Koble fra ---
             self._stopp_logging()
@@ -297,18 +287,9 @@ class PIDGUI(ttk.Frame):
                     self._koble_fra_fn()
                 except Exception as e:
                     messagebox.showerror("Frakoblingsfeil", str(e))
-            self._tilkoblet = False
+            self._trygg_lukk_port()
 
-        # Oppdater statuslinje/knapp
-        sp = getattr(self, "serieport", None)
-        faktisk_apen = bool(sp and sp.is_open)
-        self._tilkoblet = faktisk_apen
-        if faktisk_apen:
-            self.koble_knapp.config(text="Koble fra")
-            self.status_lbl.config(text=f"Status: tilkoblet ({self.port_var.get().strip() or '<ukjent>'})")
-        else:
-            self.koble_knapp.config(text="Koble til")
-            self.status_lbl.config(text="Status: frakoblet")
+        self._oppdater_status_from_port()
 
     # ---------- Logging og lesetråd ----------
 
@@ -341,16 +322,13 @@ class PIDGUI(ttk.Frame):
                 pass
             self._logg_fil = None
 
-        self._tilkoblet = False
-        self.koble_knapp.config(text="Koble til")
-        self.status_lbl.config(text="Status: frakoblet")
+        self._oppdater_status_from_port()
 
     def _les_loop(self):
-        sp = getattr(self, "serieport", None)
+        sp = self.serieport
         if sp is None or not sp.is_open:
             return
-
-        # Big-endian: 1B header, 4B tid_ms (uint32), 2B verdi (uint16), 1B tail
+        
         PAKKE = struct.Struct(">BIHB")
 
         while not self._lesetraads_stop.is_set() and sp.is_open:
@@ -373,26 +351,26 @@ class PIDGUI(ttk.Frame):
                 if self._mcu_tid_start is None:
                     self._mcu_tid_start = tid_ms
                 delta_ms = (tid_ms - self._mcu_tid_start) & 0xFFFFFFFF
-                mcu_tid_s = delta_ms / 100
+                mcu_tid_s = delta_ms / 100  
 
                 # Logg til fil
                 if self._logg_fil is not None:
-                    try:
-                        self._logg_fil.write(f"{mcu_tid_s},{int(verdi)}\n")
-                    except Exception as le:
-                        self._status_kø.put(f"Loggfeil: {le}")
+                    self._logg_fil.write(f"{mcu_tid_s},{int(verdi)}\n")
 
                 # Legg på GUI-kø (hovedtråd henter)
                 self._lesetraads_kø.put((mcu_tid_s, int(verdi)))
 
             except Exception as e:
-                self._status_kø.put(f"Lesefeil: {e}")
+                print(f"Lesefeil: {e}")
                 try:
                     if sp and sp.is_open:
                         sp.close()
                 except Exception:
                     pass
                 self.serieport = None
+
+                # synkroniser UI i hovedtråd
+                self.after(50, self._oppdater_status_from_port)
                 break
 
     def _tøm_kø_og_oppdater(self):
@@ -404,15 +382,12 @@ class PIDGUI(ttk.Frame):
         except queue.Empty:
             pass
 
+        # Hold knapp/status i sync med faktisk portstatus
+        self._oppdater_status_from_port()
+
         # Neste poll
-        self.after(33, self._tøm_kø_og_oppdater)
+        self.after(50, self._tøm_kø_og_oppdater)
 
     def lukk(self):
         self._stopp_logging()
-        sp = getattr(self, "serieport", None)
-        if sp is not None:
-            try:
-                if sp.is_open:
-                    sp.close()
-            except Exception:
-                pass
+        self._trygg_lukk_port()

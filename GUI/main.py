@@ -4,74 +4,72 @@ import serial
 import struct
 from pid_gui import PIDGUI
 
-
 def main():
     rot = tk.Tk()
     app = PIDGUI(rot)
     app.pack(fill=tk.BOTH, expand=True)
+    app.serieport = None  # initér eksplisitt
 
-    # Serieport-tilkoblingshandler
-
+    # --- Tilkoblingshåndterere ---
     def min_koble_til(portstreng):
-        # Lukk gammel port hvis åpen
+        # Lukk gammel port (viktig for å unngå lås)
         sp_gammel = getattr(app, "serieport", None)
-        if sp_gammel is not None and sp_gammel.is_open:
+        if sp_gammel and sp_gammel.is_open:
             try:
                 sp_gammel.close()
             except Exception:
                 pass
 
-        # Åpne ny
         try:
             sp_ny = serial.Serial(port=portstreng, baudrate=115200, timeout=1)
         except Exception as e:
-            raise RuntimeError(f"Kunne ikke åpne {portstreng}: {e}") from e
+            raise RuntimeError("Kunne ikke åpne {}: {}".format(portstreng, e))
 
         if not sp_ny.is_open:
-            raise RuntimeError(f"Port {portstreng} ble ikke åpnet.")
+            raise RuntimeError("Port {} ble ikke åpnet.".format(portstreng))
 
         app.serieport = sp_ny
-        print(f"Status: tilkoblet: {portstreng}")
+        print("Status: tilkoblet {}".format(portstreng))
         return True
 
     def min_koble_fra():
         sp = getattr(app, "serieport", None)
-        if sp is not None:
+        if sp and sp.is_open:
             try:
-                if sp.is_open:
-                    sp.close()
+                sp.close()
             except Exception:
                 pass
         app.serieport = None
         print("Status: koblet fra")
 
+    # PID-sender
     def min_pid_handler(settpunkt, kp, ki, kd):
-        # Sjekk tilkoblingsstatus før sending
-        if not app._tilkoblet:
-            print("Status: ikke tilkoblet – sender ikke PID")
-            return
+        HEADER_VERDI = 0xAA
         sp = getattr(app, "serieport", None)
         if sp is None or not sp.is_open:
-            print("Status: serieport ikke tilgjengelig/åpen – sender ikke PID")
+            print("Status: ikke tilkoblet – sender ikke PID")
             return
-        try:
-            # Header i MSB (69) + 24-bit payload for settpunkt
-            header = 0xFF
-            sp_encoded = ((header & 0xFF) << 24) | (int(settpunkt) & 0xFFFFFF)
-            pkt = struct.pack("<iiii", sp_encoded, int(kp), int(ki), int(kd))
-            sp.write(pkt)
-            sp.flush()
-            print(f"Status: sendt 16B pakke: header=69, SP={settpunkt}, Kp={kp}, Ki={ki}, Kd={kd}")
-        except Exception as e:
-            messagebox.showerror("Sendefeil", f"Kunne ikke sende PID-verdier: {e}")
 
-    # Registrer handlers i GUI
+        try:
+            # 32-bit: [8-bit header | 24-bit settpunkt] (MSB = header)
+            sp_encoded = ((HEADER_VERDI & 0xFF) << 24) | (int(settpunkt) & 0xFFFFFF)
+
+            # Pakk som USIGNERT 32-bit + tre SIGNERTE 32-bit
+            pkt = struct.pack("<Iiii", sp_encoded, int(kp), int(ki), int(kd))
+            sp.write(pkt)
+            print("Sendt 16B pakke: header={}, SP={}, Kp={}, Ki={}, Kd={}".format(
+                HEADER_VERDI, settpunkt, kp, ki, kd
+            ))
+        except Exception as e:
+            messagebox.showerror("Sendefeil", "Kunne ikke sende PID-verdier: {}".format(e))
+
+    # Registrer i GUI
     app.registrer_tilkoblingshandler(min_koble_til, min_koble_fra)
     app.registrer_pid_callback(min_pid_handler)
 
-    # Ryddig lukking
+    # Lukking
     def on_close():
-        app.lukk()
+        app.lukk()   # lukk GUI, stopp tråder, lukk port
         rot.destroy()
 
     rot.protocol("WM_DELETE_WINDOW", on_close)
