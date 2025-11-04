@@ -129,20 +129,6 @@ void SystemClock_Config(void);
 #define sensorNode_Enable_GPIO_Port          GPIOB
 #define sensorNode_Enable_GPIO_CLK_ENABLE()  LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB)
 
-// /**
-//   * @brief Filter CLK Pin PD12
-//   */
-// #define F_CLK_Pin                           LL_GPIO_PIN_12
-// #define F_CLK_GPIO_Port                     GPIOD
-// #define F_CLK_GPIO_CLK_ENABLE()             LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOD)
-
-// /**
-//   * @brief Analog sensor Pin PB1
-//   */
-// #define AS_PIN                              LL_GPIO_PIN_1
-// #define AS_PIN_GPIO_Port                    GPIOB
-// #define AS_GPIO_CLK_ENABLE()                LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB)
-
 /**
   * @brief DIR Pin PB5
   */

@@ -19,8 +19,10 @@ int USART_StartRx_DMA(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length);
 int USART_SendBuffer_IT(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length);
 
 
-void USART_Transmit_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand);
+// Transmit funkjsoner for sensorNode and styreNode
 void USART_Transmit_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte);
+void USART_Transmit_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand);
+void USART_Transmit_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t error, uint64_t U);
 void USART_Transmit_Tid_Avstand_Avvik(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t mmAvvik);
 
 /* Non-blocking transmit using TXE/TC interrupts
@@ -29,27 +31,12 @@ void USART_Transmit_Tid_Avstand_Avvik(USART_TypeDef *USARTx, uint32_t tid, uint1
 
 
 /* Interrupt handlers ------------------------------------------------------------*/
-void USART_TXE_Handler(USART_TypeDef *USARTx);
-void USART_TC_Handler(USART_TypeDef *USARTx);
-void USART_HandleDMA_RxComplete(USART_TypeDef *USARTx);
-void USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len);
-
-/* Called by dma.c (on DMA transfer complete) to let USART module notify higher layer.
- * Implemented in usart.c and will call the weak callback below with buffer pointer and length.
- */
+void USART_TXE_Handler(USART_TypeDef *USARTx);             // Transmit data register empty handler
+void USART_TC_Handler(USART_TypeDef *USARTx);              // Transmission Complete handler
+void USART_HandleDMA_RxComplete(USART_TypeDef *USARTx);    // DMA Receive buffer complete handler
+void USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len);  // RX DMA complete callback
 
 
-/* Weak callback invoked when a DMA RX transfer completes. Provides buffer pointer and length.
- * Override in application (e.g. styreNode.c) to process data.
- */
-
-
-
-
-// volatile uint8_t usart2_rx_data[8];
-// volatile uint8_t usart3_rx_data[8];
-// voltile uint8_t usart2_data_ready;
-// volatile uint8_t usart3_data_ready;
 #ifdef __cplusplus
 }
 #endif
