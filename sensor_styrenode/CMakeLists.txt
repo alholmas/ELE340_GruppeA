@@ -71,6 +71,7 @@ set(PROJECT_Application_Src
     # HAL MSP file (kommenter ut hvis bare LL brukes)
     # ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/stm32f3xx_hal_msp.c
     # User-defined source files
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/pid.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/tim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/gpio.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc.c

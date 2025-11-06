@@ -33,6 +33,9 @@ volatile uint8_t sensorNode = 0; // Variabel for å bestemme om modulen er senso
 int main(void)
 {
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+
+
+
   LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SYSCFG);
   LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
   
