@@ -6,6 +6,8 @@
 #include <string.h>
 
 
+extern volatile uint16_t sensorNode;
+
 void USART2_Init(void)
 {
   LL_USART_InitTypeDef USART_InitStruct = {0};
@@ -234,7 +236,14 @@ void USART_HandleDMA_RxComplete(USART_TypeDef *USARTx)
   uint16_t len = rx->len;
   rx->active = 0;
   if (buf != NULL && len != 0) {
-    USART_RxDMAComplete_Callback(USARTx, buf, len);
+    if(sensorNode)
+    {
+      USART_RxDMAComplete_Callback_SensorNode(USARTx, buf, len);
+    }
+    else
+    {
+      USART_RxDMAComplete_Callback_StyreNode(USARTx, buf, len);
+    }
   }
 }
 
@@ -354,7 +363,13 @@ void USART_Transmit_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uin
 }
 
 
-void __attribute__((weak)) USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
+void __attribute__((weak)) USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
+{
+  /* Default empty implementation; override in application to process received buffer */
+  (void)USARTx; (void)buf; (void)len;
+}
+
+void __attribute__((weak)) USART_RxDMAComplete_Callback_SensorNode(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
 {
   /* Default empty implementation; override in application to process received buffer */
   (void)USARTx; (void)buf; (void)len;

@@ -5,21 +5,19 @@
 
 /* Include peripheral drivers -----------------------------------------------*/
 #include "adc.h"
-#include "stm32f3xx_ll_gpio.h"
-#include "stm32f3xx_ll_usart.h"
-#include "stm32f3xx_ll_utils.h"
 #include "tim.h"
 #include "gpio.h"
 #include "usart.h"
-#include <stdint.h>
-#include <sys/stat.h>
 #include "dma.h"
+#include "pid.h"
 
 /* RX buffer for DMA reception from sensor node (8-byte packets) */
 static uint8_t usart3_Rx_buf[8];
 static uint8_t usart2_Rx_buf[13];
 static uint64_t U = 0x004500A9010D0171;
 static uint16_t error = 0x01D5;
+static pid_t pid = {0};
+// static uint32_t HZ_test = 0;
 // static volatile uint8_t usart2_Rx_buf[8];
 
 
@@ -38,23 +36,25 @@ void StyreNode_Init(void)
   /* Oppstart av perifere enheter for sensorNode ----------------------*/
   (void)USART_StartRx_DMA(USART3, usart3_Rx_buf, sizeof(usart3_Rx_buf));
   (void)USART_StartRx_DMA(USART2, usart2_Rx_buf, sizeof(usart2_Rx_buf));
-  TIM3_Start_PWM();
+  // TIM3_Start_PWM();
+  pid_init(&pid, 200, 200, 200, 69, 25000);
 
 }
 
 void StyreNode_Loop(void)
 {
-	  for (int i = 0; i < 100; i++)
-  {
-    (void)TIM3_SetFrequencyHz(10000 + i * 100);
-    LL_mDelay(500);
-  }
+  // for (int i = 100000; i < 250000; i+=1000)
+  // {
+  //   HZ_test = i;
+  //   TIM3_SetFrequencyHz(i);
+  //   LL_mDelay(500);
+  // }
 }
 /* SensorNode spesifikke funksjoner -------------------------------------*/
 
 
 /* Interrupt Callback --------------------------------------------------- */
-void USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
+void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
 {
   if (USARTx == USART3) {
     if (len >= 8 && buf[0] == 0xAA && buf[7] == 0x55) {
@@ -81,11 +81,11 @@ void USART_RxDMAComplete_Callback(USART_TypeDef *USARTx, uint8_t *buf, uint16_t 
       uint16_t setpoint = (uint16_t)buf[10] | ((uint16_t)buf[11] << 8);
 
       if (start_stop_byte == 0x01) {
-        USART_Transmit_Start_Stop(USART2, 0x01);
-        LL_GPIO_TogglePin(LED3_GPIO_PORT, LED3_PIN);
+        USART_Transmit_Start_Stop(USART3, 0x01);
+        LL_GPIO_SetOutputPin(LED3_GPIO_PORT, LED3_PIN);
       } else if (start_stop_byte == 0x00) {
-        USART_Transmit_Start_Stop(USART2, 0x00);
-        LL_GPIO_TogglePin(LED3_GPIO_PORT, LED3_PIN);
+        USART_Transmit_Start_Stop(USART3, 0x00);
+        LL_GPIO_ResetOutputPin(LED3_GPIO_PORT, LED3_PIN);
       } else if (start_stop_byte == 0x02 || start_stop_byte == 0x01) {
         /* Oppdater parametere (bruk variablene som trengs) */
         LL_GPIO_TogglePin(LED10_GPIO_PORT, LED10_PIN);
