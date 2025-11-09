@@ -1,6 +1,4 @@
 #include "styreNode.h"
-#include "main.h"
-#include "stm32f303xc.h"
 
 
 /* Include peripheral drivers -----------------------------------------------*/
@@ -44,25 +42,51 @@ void StyreNode_Loop(void)
 
 }
 /* SensorNode spesifikke funksjoner -------------------------------------*/
-void set_linmot_paadrag(int32_t paadrag)
-{
-  if(paadrag > 0)
-  {
-    LL_GPIO_ResetOutputPin(DIR_GPIO_Port, DIR_Pin);
+// void set_linmot_paadrag(int32_t paadrag)
+// {
+//   if(paadrag > 0)
+//   {
+//     LL_GPIO_ResetOutputPin(DIR_GPIO_Port, DIR_Pin);
 
-    TIM3_SetFrequencyHz((uint16_t)paadrag*100);
-  }
-  else if(paadrag < 0)
+//     TIM3_SetFrequencyHz((uint16_t)paadrag*100);
+//   }
+//   else if(paadrag < 0)
+//   {
+//     LL_GPIO_SetOutputPin(DIR_GPIO_Port, DIR_Pin);
+//     paadrag = -paadrag;
+//     TIM3_SetFrequencyHz((uint16_t)paadrag*100);
+//   }
+//   else if(paadrag == 0)
+//   {
+//     TIM3_SetFrequencyHz(0);
+//   }
+// }
+
+void set_linmot_paadrag(pid_t *pid)
+{
+  if (!pid) return;
+  int32_t paadrag = pid->output * 100;
+  int32_t error = pid->error;
+  if (error > 2 || error < -2)
   {
-    LL_GPIO_SetOutputPin(DIR_GPIO_Port, DIR_Pin);
-    paadrag = -paadrag;
-    TIM3_SetFrequencyHz((uint16_t)paadrag*100);
+    if (paadrag > 0)
+    {
+      LL_GPIO_ResetOutputPin(DIR_GPIO_Port, DIR_Pin);
+      TIM3_SetFrequencyHz(paadrag);
+    }
+    else if (paadrag < 0)
+    {
+      paadrag = -paadrag;
+      LL_GPIO_SetOutputPin(DIR_GPIO_Port, DIR_Pin);
+      TIM3_SetFrequencyHz(paadrag);
+    }
   }
-  else if(paadrag == 0)
+  else
   {
     TIM3_SetFrequencyHz(0);
   }
 }
+
 
 /* Interrupt Callback --------------------------------------------------- */
 void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
@@ -73,11 +97,11 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
       /* Little-endian: LSB first */
       uint32_t tid = (uint32_t)buf[1] | ((uint32_t)buf[2] << 8) | ((uint32_t)buf[3] << 16) | ((uint32_t)buf[4] << 24);
       uint16_t mm = (uint16_t)buf[5] | ((uint16_t)buf[6] << 8);
+      
+      (void)compute_PID_Output(&pid, mm);
+      set_linmot_paadrag(&pid);
       /* Sender data videre til PC */
       USART_Tx_Tid_Avstand_PidPaadrag(USART2, tid, mm, &pid);
-      int32_t U = compute_PID_Output(&pid, mm);
-      // USART_Tx_Tid_Avstand_Paadrag(USART2, tid, mm, error, U);
-      set_linmot_paadrag(U);
     }
 
     /* Restart DMA */
@@ -105,6 +129,7 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
           LL_GPIO_TogglePin(LED10_GPIO_PORT, LED10_PIN);
           USART_Tx_Start_Stop(USART3, start_stop_byte);
           pid_init(&pid, Kp, Ti, Td, setpoint, integral_limit);
+          reset_pid(&pid);
         break;
         case 2: // Oppdater signal mottat fra GUI,setter KP, TI, TD, Setpoint og integral begrensing
           update_pid_parameters(&pid, Kp, Ti, Td, setpoint, integral_limit);

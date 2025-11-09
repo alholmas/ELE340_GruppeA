@@ -334,7 +334,7 @@ void USART_Tx_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstan
   dataBuffer[6] = (mmAvstand >> 8) & 0xFF;  // Most significant byte av mmAvstand
   dataBuffer[7] = 0x55;                     // Footer endbyte
 
-  /* Use non-blocking transmit so ADC EOC ISR won't be blocked */
+
   (void)USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 

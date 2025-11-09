@@ -35,7 +35,8 @@ typedef struct {
 
 void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoint, uint16_t integral_limit);
 void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoint, uint16_t integral_limit);
-int32_t compute_PID_Output(pid_t *pid, uint16_t measured_value);
+void reset_pid(pid_t *pid);
+void compute_PID_Output(pid_t *pid, uint16_t measured_value);
 
 
 
