@@ -65,7 +65,7 @@ void StyreNode_Loop(void)
 void set_linmot_paadrag(pid_t *pid)
 {
   if (!pid) return;
-  int32_t paadrag = pid->output * 100;
+  int32_t paadrag = pid->output;
   int32_t error = pid->error;
   if (error > 2 || error < -2)
   {
