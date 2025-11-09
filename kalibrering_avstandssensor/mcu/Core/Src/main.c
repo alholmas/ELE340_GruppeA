@@ -43,11 +43,15 @@
 ADC_HandleTypeDef hadc3;
 
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim7;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+volatile uint16_t button_press_count = 0;
+volatile uint32_t adc_mV = 0;
+volatile uint16_t last_pos = 0;
+volatile uint8_t transmit_pending = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -56,13 +60,14 @@ static void MX_GPIO_Init(void);
 static void MX_ADC3_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM7_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-volatile uint16_t button_press_count = 0;
+
 /* USER CODE END 0 */
 
 /**
@@ -97,10 +102,14 @@ int main(void)
   MX_ADC3_Init();
   MX_TIM4_Init();
   MX_USART2_UART_Init();
+  MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1); // Start PWM on TIM4 Channel 1
   HAL_ADCEx_Calibration_Start(&hadc3, ADC_SINGLE_ENDED); // Calibrate ADC3
-  
+  HAL_TIM_Base_Start(&htim7); // Start TIM7 base generation
+ 
+ 
+  HAL_ADC_Start_IT(&hadc3);
   
 
   /* USER CODE END 2 */
@@ -190,8 +199,8 @@ static void MX_ADC3_Init(void)
   hadc3.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc3.Init.ContinuousConvMode = DISABLE;
   hadc3.Init.DiscontinuousConvMode = DISABLE;
-  hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc3.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
+  hadc3.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T7_TRGO;
   hadc3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc3.Init.NbrOfConversion = 1;
   hadc3.Init.DMAContinuousRequests = DISABLE;
@@ -279,6 +288,44 @@ static void MX_TIM4_Init(void)
 }
 
 /**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 7199;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 99;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -353,37 +400,48 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if (GPIO_Pin == B1_Pin) // Check if the interrupt is from pin PA0
   {
+     uint16_t pos;
+     button_press_count++;
 
-	 uint16_t pos;
-	 button_press_count++;
-	 HAL_ADC_Start(&hadc3); // Start ADC conversion
-	 HAL_ADC_PollForConversion(&hadc3, 10); // Wait for conversion to complete
-	 uint16_t adc_value = HAL_ADC_GetValue(&hadc3); // Get the ADC value
-	 uint16_t adc_mV = (adc_value * 3000) / 4096;
-	 
+     if (button_press_count == 1) pos = 200;
+     else pos = 300 + (uint16_t)(button_press_count - 2) * 100;
 
-	 if (button_press_count == 1) pos = 150;
-	 else pos = 200 + (uint16_t)(button_press_count - 2) * 100;
-	 
-	 if (pos <= 1000)
+     if (pos <= 1000)
      {
-		 uint8_t data_buffer[4];
-		 data_buffer[0] = pos & 0xFF; // Low byte
-		 data_buffer[1] = (pos >> 8) & 0xFF; // High byte
-		 data_buffer[2] = adc_mV & 0xFF; // Low byte
-		 data_buffer[3] = (adc_mV >> 8) & 0xFF; // High byte
-		 HAL_UART_Transmit_IT(&huart2, data_buffer, sizeof(data_buffer)); // Transmit data over UART
+         last_pos = pos;
+         transmit_pending = 1;
+         // Trigger TIM7 update event (TIM7 is configured to TRGO_UPDATE)
+         HAL_TIM_GenerateEvent(&htim7, TIM_EVENTSOURCE_UPDATE);
      }
-	 else
-	 {
-		 uint8_t data_buffer[4] = {0, 0, 0, 0};
-		 HAL_UART_Transmit_IT(&huart2, (uint8_t*)data_buffer, sizeof(data_buffer)); // Transmit zeros over UART
-		 button_press_count = 0; // Reset count if exceeds 1000
-	 }
-	 
+     else
+     {
+         uint8_t data_buffer[4] = {0, 0, 0, 0};
+         HAL_UART_Transmit_IT(&huart2, (uint8_t*)data_buffer, sizeof(data_buffer)); // Transmit zeros over UART
+         button_press_count = 0; // Reset count
+     }
   }
 }
 
+// ADC conversion complete callback: read ADC3 and transmit if requested
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+{
+  if (hadc->Instance == ADC3)
+  {
+    uint32_t adc_value = HAL_ADC_GetValue(hadc);
+    adc_mV = (adc_value * 3000UL) / 4096UL; // adjust Vref as needed
+
+    if (transmit_pending)
+    {
+      uint8_t data_buffer[4];
+      data_buffer[0] = last_pos & 0xFF;
+      data_buffer[1] = (last_pos >> 8) & 0xFF;
+      data_buffer[2] = adc_mV & 0xFF;
+      data_buffer[3] = (adc_mV >> 8) & 0xFF;
+      HAL_UART_Transmit_IT(&huart2, data_buffer, sizeof(data_buffer));
+      transmit_pending = 0;
+    }
+  }
+}
 
 /* USER CODE END 4 */
 

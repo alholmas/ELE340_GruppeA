@@ -7,6 +7,7 @@ extern "C" {
 #endif
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "pid.h"
 
 /* Init USART ----------------------------------------------------------------*/
 void USART2_Init(void);
@@ -16,14 +17,15 @@ void USART3_Init(void);
 /* Metoder for USART ------------------------------------------------------------*/
 void USART_Tx(USART_TypeDef *USARTx, uint8_t Value);
 int USART_StartRx_DMA(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length);
-int USART_SendBuffer_IT(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length);
+int USART_Tx_Buffer_IT(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length);
 
 
 // Transmit funkjsoner for sensorNode and styreNode
-void USART_Transmit_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte);
-void USART_Transmit_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand);
-void USART_Transmit_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t error, uint64_t U);
-void USART_Transmit_Tid_Avstand_Avvik(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t mmAvvik);
+void USART_Tx_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte);
+void USART_Tx_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand);
+void USART_Tx_Tid_Avstand_PidPaadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, pid_t *pid);
+
+void USART_Tx_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t error, uint64_t U);
 
 
 /* Interrupt handlers ------------------------------------------------------------*/

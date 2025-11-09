@@ -1,5 +1,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
+#include "pid.h"
 #include "stm32f303xc.h"
 #include "stm32f3xx_ll_usart.h"
 #include <stdint.h>
@@ -132,7 +133,7 @@ void USART3_Init(void)
 typedef struct {
   volatile uint8_t busy;
   uint8_t buf[USART_TX_BUF_SIZE];
-  volatile uint16_t len;
+  uint16_t len;
   volatile uint16_t idx;
 } usart_tx_t;
 
@@ -247,7 +248,7 @@ void USART_HandleDMA_RxComplete(USART_TypeDef *USARTx)
   }
 }
 
-int USART_SendBuffer_IT(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
+int USART_Tx_Buffer_IT(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
 {
   if (buffer == NULL || length == 0) return -1;
   usart_tx_t *tx = usart_get_tx(USARTx);
@@ -311,17 +312,17 @@ void USART_TC_Handler(USART_TypeDef *USARTx)
 //   }
 // }
 
-void USART_Transmit_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte)
+void USART_Tx_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte)
 {
   uint8_t dataBuffer[3];
   dataBuffer[0] = 0xAA;                       // Header startbyte
   dataBuffer[1] = start_stop_byte;            // Start/Stop byte
   dataBuffer[2] = 0x55;                       // Footer endbyte
 
-  (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+  (void)USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
-void USART_Transmit_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand)
+void USART_Tx_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand)
 {
   uint8_t dataBuffer[8];
   dataBuffer[0] = 0xAA;                     // Header startbyte
@@ -334,10 +335,47 @@ void USART_Transmit_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mm
   dataBuffer[7] = 0x55;                     // Footer endbyte
 
   /* Use non-blocking transmit so ADC EOC ISR won't be blocked */
-  (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+  (void)USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
-void USART_Transmit_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t error, uint64_t U)
+void USART_Tx_Tid_Avstand_PidPaadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, pid_t *pid)
+{
+  uint8_t dataBuffer[28];
+  dataBuffer[0] = 0xAA;                       // Header startbyte
+  dataBuffer[1] = tid & 0xFF;                // Least significant byte av tid (little-endian)
+  dataBuffer[2] = (tid >> 8) & 0xFF;
+  dataBuffer[3] = (tid >> 16) & 0xFF;
+  dataBuffer[4] = (tid >> 24) & 0xFF;         
+  dataBuffer[5] = mmAvstand & 0xFF;           
+  dataBuffer[6] = (mmAvstand >> 8) & 0xFF;    
+  dataBuffer[7] = pid->error & 0xFF;                  
+  dataBuffer[8] = (pid->error >> 8) & 0xFF;
+  dataBuffer[9] = (pid->error >> 16) & 0xFF;
+  dataBuffer[10] = (pid->error >> 24) & 0xFF;
+  dataBuffer[11] = (pid->output) & 0xFF;    
+  dataBuffer[12] = (pid->output >> 8) & 0xFF;
+  dataBuffer[13] = (pid->output >> 16) & 0xFF;
+  dataBuffer[14] = (pid->output >> 24) & 0xFF;
+  dataBuffer[15] = pid->proportional & 0xFF;
+  dataBuffer[16] = (pid->proportional >> 8) & 0xFF;
+  dataBuffer[17] = (pid->proportional >> 16) & 0xFF;
+  dataBuffer[18] = (pid->proportional >> 24) & 0xFF;
+  dataBuffer[19] = pid->integral & 0xFF;
+  dataBuffer[20] = (pid->integral >> 8) & 0xFF;
+  dataBuffer[21] = (pid->integral >> 16) & 0xFF;
+  dataBuffer[22] = (pid->integral >> 24) & 0xFF;
+  dataBuffer[23] = pid->derivative & 0xFF;
+  dataBuffer[24] = (pid->derivative >> 8) & 0xFF;
+  dataBuffer[25] = (pid->derivative >> 16) & 0xFF;
+  dataBuffer[26] = (pid->derivative >> 24) & 0xFF;
+  dataBuffer[27] = 0x55;                       // Footer endbyte
+
+  (void)USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+}
+
+
+
+void USART_Tx_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t error, uint64_t U)
 {
   uint8_t dataBuffer[18];
   dataBuffer[0] = 0xAA;                       // Header startbyte
@@ -359,7 +397,7 @@ void USART_Transmit_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uin
   dataBuffer[16] = (U >> 56) & 0xFF;          // Most significant byte av U
   dataBuffer[17] = 0x55;                       // Footer endbyte
 
-  (void)USART_SendBuffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+  (void)USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
 
