@@ -13,7 +13,7 @@ typedef struct {
   uint16_t Kd; // Derivative forsterkning
 
   uint16_t setpoint;        // Refranse/setpunkt y_r(k)
-  uint16_t integral_limit;  // Begrensning for integral delen
+  uint32_t integral_limit;  // Begrensning for integral delen
 
   int32_t proportional;   // Proportional del U_p(k)
   int32_t integral;       // Integral del U_i(k)
@@ -29,12 +29,11 @@ typedef struct {
 
   int32_t output;          // Pid pådrag U(k)
   int32_t output_limit;    // Pid pådragsbegresning
-
 } pid_t;
 
 
-void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoint, uint16_t integral_limit);
-void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoint, uint16_t integral_limit);
+void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoint, uint32_t integral_limit);
+void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoint, uint32_t integral_limit);
 void reset_pid(pid_t *pid);
 void compute_PID_Output(pid_t *pid, uint16_t measured_value);
 
