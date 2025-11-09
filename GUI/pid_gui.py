@@ -318,10 +318,10 @@ class PIDGUI(ttk.Frame):
 
         # Mottatt data fra Styrenode
         self.err_data.append(int(e))
-        self.u_data.append(int(u))
-        self.up_data.append(int(up))
-        self.ui_data.append(int(ui))
-        self.ud_data.append(int(ud))
+        self.u_data.append(int(u)/1000)
+        self.up_data.append(int(up)/1000)
+        self.ui_data.append(int(ui)/1000)
+        self.ud_data.append(int(ud)/1000)
 
         self.info_lbl.config(text=f"Avstand: {int(pv)}")
         self._oppdater_plott()
