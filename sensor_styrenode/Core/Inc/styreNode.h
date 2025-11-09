@@ -7,7 +7,7 @@
 void StyreNode_Init(void);
 void StyreNode_Loop(void);
 
-
+void set_linmot_paadrag(int32_t paadrag);
 
 #endif // STYRE_NODE_H
 

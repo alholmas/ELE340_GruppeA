@@ -20,8 +20,8 @@ typedef struct {
   int32_t integral_prev;  // Forrige integral del U_i(k-1)
   int32_t derivative;     // Derivative del U_d(k)
 
-  int16_t error;          // Avvik e(k)
-  int16_t error_prev;     // Forrige avvik e(k-1)
+  int32_t error;          // Avvik e(k)
+  int32_t error_prev;     // Forrige avvik e(k-1)
 
   int32_t filtered_measurement;      // Filtered measurement y_fm(k)
   int32_t filtered_measurement_prev; // Forrige filtered measurement y_fm(k-1)

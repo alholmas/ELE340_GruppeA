@@ -68,12 +68,12 @@ void ADC3_StartConversion_TRGO(void)
 { 
   // Clear EOC flag
   LL_ADC_ClearFlag_EOC(ADC3);
-  // Kalibrering av ADC
-  LL_ADC_StartCalibration(ADC3, LL_ADC_SINGLE_ENDED);
-  while (LL_ADC_IsCalibrationOnGoing(ADC3)) {
-    /* wait calibration */
-  }
-  // Enable end of conversion interrupt
+  // // Kalibrering av ADC
+  // LL_ADC_StartCalibration(ADC3, LL_ADC_SINGLE_ENDED);
+  // while (LL_ADC_IsCalibrationOnGoing(ADC3)) {
+  //   /* wait calibration */
+  // }
+  // // Enable end of conversion interrupt
   LL_ADC_EnableIT_EOC(ADC3);
   // Enable ADC
   LL_ADC_Enable(ADC3);

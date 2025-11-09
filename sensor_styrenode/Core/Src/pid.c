@@ -26,7 +26,7 @@ void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoi
   pid->filtered_measurement_prev = 0;
 
   pid->output = 0;
-  pid->output_limit = 0;
+  pid->output_limit = 2500;
 
 }
 
@@ -76,12 +76,6 @@ int32_t compute_PID_Output(pid_t *pid, uint16_t measured_value) {
   return pid->output;
 }
 
-// void set_pid_output()
-// {
-//   if(paadrag >0)
-//   {
 
-//   }
-// }
 
 
