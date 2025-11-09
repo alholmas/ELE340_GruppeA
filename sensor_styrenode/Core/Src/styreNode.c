@@ -12,7 +12,7 @@
 
 /* RX buffer for DMA reception from sensor node (8-byte packets) */
 static uint8_t usart3_Rx_buf[8];
-static uint8_t usart2_Rx_buf[13];
+static uint8_t usart2_Rx_buf[15];
 static pid_t pid = {0};
 
 
@@ -110,14 +110,14 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
   }
   // Mottak fra GUI
   else if (USARTx == USART2) {
-    if (len >= 13 && buf[0] == 0xAA && buf[12] == 0x55) {
+    if (len >= 15 && buf[0] == 0xAA && buf[14] == 0x55) {
       uint8_t start_stop_byte = buf[1];
       /* Little-endian: LSB first for 16-bit fields */
       uint16_t Kp = (uint16_t)buf[2] | ((uint16_t)buf[3] << 8);
       uint16_t Ti = (uint16_t)buf[4] | ((uint16_t)buf[5] << 8);
       uint16_t Td = (uint16_t)buf[6] | ((uint16_t)buf[7] << 8);
-      uint16_t integral_limit = (uint16_t)buf[8] | ((uint16_t)buf[9] << 8);
-      uint16_t setpoint = (uint16_t)buf[10] | ((uint16_t)buf[11] << 8);
+      uint32_t integral_limit = (uint16_t)buf[8] | ((uint16_t)buf[9] << 8) | ((uint16_t)buf[10] << 16) | ((uint16_t)buf[11] << 24);
+      uint16_t setpoint = (uint16_t)buf[12] | ((uint16_t)buf[13] << 8);
     
       
       switch (start_stop_byte) {
