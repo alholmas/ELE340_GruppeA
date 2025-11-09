@@ -282,8 +282,8 @@ class PIDGUI(ttk.Frame):
         # Konverter verdier direkte
         sp_int = int(sp)
         kp_int = int(kp * 1000)        # Konverterer til 1000 for å unngå float på uC
-        ti_int = int(ti * 1000)        # Konverterer til 1000 for å unngå float på uC
-        td_int = int(td * 1000)        # Konverterer til 1000 for å unngå float på uC
+        ti_int = int(ti)        # Konverterer til 1000 for å unngå float på uC
+        td_int = int(td)        # Konverterer til 1000 for å unngå float på uC
         ib_int = int(ib * 1000)        # Konverterer til 1000 for å unngå float på uC
         
         # Sett settpunkt til gjeldende hvis start eller oppdatering

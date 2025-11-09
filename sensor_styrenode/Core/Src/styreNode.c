@@ -121,16 +121,18 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
       switch (start_stop_byte) {
         case 0: // Stopp signal mottat fra GUI
           USART_Tx_Start_Stop(USART3, start_stop_byte);
-          LL_GPIO_SetOutputPin(LED3_GPIO_PORT, LED3_PIN);
+          reset_pid(&pid);
+          TIM3_SetFrequencyHz(0);
         break;
         case 1: // Start signal mottat fra GUI, settter PID verdier
           LL_GPIO_TogglePin(LED10_GPIO_PORT, LED10_PIN);
           USART_Tx_Start_Stop(USART3, start_stop_byte);
           pid_init(&pid, Kp, Ti, Td, setpoint, integral_limit);
-          reset_pid(&pid);
+          
         break;
         case 2: // Oppdater signal mottat fra GUI,setter KP, TI, TD, Setpoint og integral begrensing
           update_pid_parameters(&pid, Kp, Ti, Td, setpoint, integral_limit);
+          LL_GPIO_SetOutputPin(LED3_GPIO_PORT, LED3_PIN);
         break;
 
       }
