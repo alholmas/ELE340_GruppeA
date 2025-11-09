@@ -41,7 +41,8 @@ def main():
             return
 
         try:
-            pkt = struct.pack("<BBHHHHHB", HEADER, start, kp, ti, td, intbegr, settpunkt_mm, TAIL)
+            # Pakkeformat: HEADER(1) + start(1) + Kp(2) + Ti(2) + Td(2) + IntLimit(4) + SP(2) + TAIL(1) = 15 bytes
+            pkt = struct.pack("<BBHHHLHB", HEADER, start, kp, ti, td, intbegr, settpunkt_mm, TAIL)
             sp.write(pkt)
             print(
                 f"Sendt pakke (len={len(pkt)}): "
