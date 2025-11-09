@@ -11,7 +11,6 @@ def main():
 
     # --- Tilkoblingshåndterere ---
     def min_koble_til(portstreng: str):
-        # Lukk gammel port (greit ved port-bytte; PIDGUI sørger for lukking ved "Koble fra")
         sp_gammel = getattr(app, "serieport", None)
         if sp_gammel and sp_gammel.is_open:
             try:

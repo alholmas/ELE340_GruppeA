@@ -1,6 +1,4 @@
-
 import os
-import sys
 import glob
 import tkinter as tk
 from tkinter import ttk, messagebox
