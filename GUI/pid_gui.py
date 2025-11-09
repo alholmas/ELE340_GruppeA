@@ -37,8 +37,8 @@ class PIDGUI(ttk.Frame):
         self.pv_data = deque(maxlen=self.max_punkt)   # prosessverdi (avstand mm)
         self.sp_data = deque(maxlen=self.max_punkt)   # settpunkt
 
-        # Setter settpunkttil nåværende verdi!
-        self.sp_gjeldende = self._parse_int(self.settpunkt_var.get()) or 0
+        # Setter settpunkt til nåværende verdi!
+        self.sp_gjeldende = int(self._parse_float(self.settpunkt_var.get()) or 0)
 
         # Dataserier fra styrenode
         self.err_data = deque(maxlen=self.max_punkt)  # e
@@ -225,12 +225,12 @@ class PIDGUI(ttk.Frame):
     # ---------- Hjelpefunksjoner ----------
 
     @staticmethod
-    def _parse_int(s):
+    def _parse_float(s):
         s = (s or "").strip()
         if s in ("", "+", "-"):
             return None
         try:
-            return int(s)
+            return float(s)
         except ValueError:
             return None
 
@@ -268,22 +268,32 @@ class PIDGUI(ttk.Frame):
     # ---------- Hovedhandlinger ----------
 
     def _bruk_pid(self, start):
-        sp  = self._parse_int(self.settpunkt_var.get())
-        kp  = self._parse_int(self.kp_var.get())
-        ti  = self._parse_int(self.ki_var.get())
-        td  = self._parse_int(self.kd_var.get())
-        ib  = self._parse_int(self.intbegr_var.get())
+        # Parse verdier fra GUI og konverter direkte til int
+        sp = self._parse_float(self.settpunkt_var.get())
+        kp = self._parse_float(self.kp_var.get())
+        ti = self._parse_float(self.ki_var.get())
+        td = self._parse_float(self.kd_var.get())
+        ib = self._parse_float(self.intbegr_var.get())
+        
         if None in (sp, kp, ti, td, ib):
-            messagebox.showwarning("Ugyldig verdi", "SP/Kp/Ti/Td/IntBegr må være heltall.")
+            messagebox.showwarning("Ugyldig verdi", "Alle verdier må være tall (kan ha desimaler).")
             return
-
+            
+        # Konverter verdier direkte
+        sp_int = int(sp)
+        kp_int = int(kp * 1000)        # Konverterer til 1000 for å unngå float på uC
+        ti_int = int(ti * 1000)        # Konverterer til 1000 for å unngå float på uC
+        td_int = int(td * 1000)        # Konverterer til 1000 for å unngå float på uC
+        ib_int = int(ib * 1000)        # Konverterer til 1000 for å unngå float på uC
+        
         # Sett settpunkt til gjeldende hvis start eller oppdatering
-        if int(start) in (1, 2) and sp is not None:
-            self.sp_gjeldende = int(sp)
+        if int(start) in (1, 2):
+            self.sp_gjeldende = sp_int
 
         try:
             if callable(self._pid_callback):
-                self._pid_callback(sp, kp, ti, td, ib, int(start))
+                # Send de konverterte int-verdiene til callback
+                self._pid_callback(sp_int, kp_int, ti_int, td_int, ib_int, int(start))
             else:
                 messagebox.showinfo("Ingen handler", "Ingen PID-handler registrert.")
         except Exception as e:
