@@ -3,7 +3,6 @@ import glob
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkinter.filedialog import askopenfilename
-
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
