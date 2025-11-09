@@ -7,6 +7,8 @@ import struct
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import serial.tools.list_ports
+import datetime
+import os
 
 
 class PIDGUI(ttk.Frame):
@@ -20,17 +22,17 @@ class PIDGUI(ttk.Frame):
         self._sett_tema()
 
         # Tilstandsvariabler (konverteres fra streng til int for validering av tegn)
-        self.settpunkt_var = tk.StringVar(value="200")
-        self.kp_var = tk.StringVar(value="200")
+        self.settpunkt_var = tk.StringVar(value="500")
+        self.kp_var = tk.StringVar(value="10")
         self.ki_var = tk.StringVar(value="0")     # Ti
-        self.intbegr_var = tk.StringVar(value="10")
-        self.kd_var = tk.StringVar(value="2000")  # Td
+        self.intbegr_var = tk.StringVar(value="0")
+        self.kd_var = tk.StringVar(value="0")  # Td
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
         self.serieport = None  # serial.Serial eller None
 
         # Data-buffere for plott (PV/SP)
-        self.max_punkt = 1000
+        self.max_punkt = 6000
         self.t_data  = deque(maxlen=self.max_punkt)   # tid [s]
         self.pv_data = deque(maxlen=self.max_punkt)   # prosessverdi (avstand mm)
         self.sp_data = deque(maxlen=self.max_punkt)   # settpunkt
@@ -48,7 +50,6 @@ class PIDGUI(ttk.Frame):
         # Eksterne callbacks
         self._pid_callback = None
         self._koble_til_fn = None
-        self._koble_fra_fn = None
 
         # Tråd og kø for innkommende data
         self._lesetraads_kø = queue.Queue()
@@ -69,7 +70,7 @@ class PIDGUI(ttk.Frame):
         self.port_cb.bind("<<ComboboxDropdown>>", lambda e: self._oppdater_porter())
 
         # Start periodisk tømming av kø
-        self.after(50, self._tøm_kø_og_oppdater)
+        self.after(100, self._tøm_kø_og_oppdater)
 
     # ---------- Tema / layout ----------
 
@@ -116,11 +117,12 @@ class PIDGUI(ttk.Frame):
         self.port_cb.pack(side=tk.LEFT, padx=(8, 8))
         ttk.Button(rad_port, text="Oppdater porter", command=self._oppdater_porter).pack(side=tk.LEFT)
 
-        rad_knapp = ttk.Frame(tilk_boks)
+        rad_knapp = ttk.Frame(rad_port)
         rad_knapp.pack(fill=tk.X, padx=8, pady=(6, 8))
         self.koble_knapp = ttk.Button(rad_knapp, text="Koble til", command=self._toggle_tilkobling)
         self.koble_knapp.pack(side=tk.LEFT)
-        self._rad_med_entry(tilk_boks, "Filnavn på logg:", self.filnavn_var)
+        self.logg_lbl = ttk.Label(tilk_boks, text="Loggnavn: Ingen logging aktiv")
+        self.logg_lbl.pack(fill=tk.X, padx=8, pady=4)
         self.status_lbl = ttk.Label(venstre_panel, text="Status: frakoblet")
         self.status_lbl.pack(fill=tk.X, padx=4, pady=(6, 10))
 
@@ -137,9 +139,9 @@ class PIDGUI(ttk.Frame):
 
         radkn = ttk.Frame(pidboks)
         radkn.pack(fill=tk.X, padx=8, pady=(6, 8))
-        ttk.Button(radkn, text="Start",        command=lambda: self._bruk_pid(start=1)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(radkn, text="Start/reset plot",        command=lambda: (self._bruk_pid(start=1), self._nullstill_graf(), self._start_logging())).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(radkn, text="Oppdater PID", command=lambda: self._bruk_pid(start=2)).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(radkn, text="Stop",         command=lambda: (self._bruk_pid(start=0), self._nullstill_graf())).pack(side=tk.LEFT)
+        ttk.Button(radkn, text="Stop",         command=lambda: (self._bruk_pid(start=0), self._stopp_logging())).pack(side=tk.LEFT)
 
         self.info_lbl = ttk.Label(venstre_panel, text="Avstand: —")
         self.info_lbl.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(6, 0))
@@ -253,9 +255,8 @@ class PIDGUI(ttk.Frame):
     def registrer_pid_callback(self, funksjon):
         self._pid_callback = funksjon
 
-    def registrer_tilkoblingshandler(self, koble_til_fn, koble_fra_fn):
+    def registrer_tilkoblingshandler(self, koble_til_fn):
         self._koble_til_fn = koble_til_fn
-        self._koble_fra_fn = koble_fra_fn
 
     def sett_pid(self, kp, ki, kd, settpunkt=None):
         if settpunkt is not None:
@@ -297,6 +298,7 @@ class PIDGUI(ttk.Frame):
         self.up_data.clear()
         self.ui_data.clear()
         self.ud_data.clear()
+        self._mcu_tid_start = None
         self._oppdater_plott()
 
     def oppdater_data(self, tid_s, pv, e, u, up, ui, ud):
@@ -353,14 +355,13 @@ class PIDGUI(ttk.Frame):
             self.port_var.set(porter[0] if porter else "")
 
     def _toggle_tilkobling(self):
-        if not bool(self.serieport and self.serieport.is_open):
+        if not (self.serieport and self.serieport.is_open):
             try:
                 if not callable(self._koble_til_fn):
                     raise RuntimeError("Tilkoblingshandler ikke satt.")
                 resultat = self._koble_til_fn(self.port_var.get())
                 if resultat is True and self.serieport and self.serieport.is_open:
                     self._nullstill_graf()
-                    self._start_logging()
                 else:
                     raise RuntimeError("Klarte ikke koble til.")
             except Exception as e:
@@ -368,13 +369,11 @@ class PIDGUI(ttk.Frame):
                 self._trygg_lukk_port()
         else:
             self._stopp_logging()
-            if callable(self._koble_fra_fn):
-                try:
-                    self._koble_fra_fn()
-                except Exception as e:
-                    messagebox.showerror("Frakoblingsfeil", str(e))
             self._trygg_lukk_port()
+            self.logg_lbl.config(text="Loggnavn: Ingen logging aktiv")
+
         self._oppdater_status_from_port()
+
 
     # ---------- Logging og lesetråd ----------
 
@@ -382,9 +381,18 @@ class PIDGUI(ttk.Frame):
         if self._lesetraad and self._lesetraad.is_alive():
             return
         try:
-            filnavn = (self.filnavn_var.get() or "").strip() or "logg.txt"
-            self._logg_fil = open(filnavn, "a", buffering=1, encoding="utf-8")
-            self._logg_fil.write("tid_s,pv,sp,e,u,up,ui,ud\n")
+            # Generer automatisk filnavn med dato og tid
+            naa = datetime.datetime.now()
+            filnavn = f"logg_{naa.strftime('%Y%m%d_%H%M%S')}.txt"
+            # Sørg for at plots-mappen finnes og lagre fil der
+            plots_mappe = os.path.join(os.getcwd(), "plots")
+            os.makedirs(plots_mappe, exist_ok=True)
+            filsti = os.path.join(plots_mappe, filnavn)
+            self.filnavn_var.set(filsti)  # Oppdater filnavn-variabel med full sti
+            self._logg_fil = open(filsti, "a", buffering=1, encoding="utf-8")
+            # Vis relativ sti for brukeren
+            self.logg_lbl.config(text=f"Loggnavn: {os.path.join('plots', filnavn)}")
+            # self._logg_fil.write("tid_s,pv,sp,e,u,up,ui,ud\n") Header
         except Exception as e:
             messagebox.showerror("Loggfil-feil", f"Kunne ikke åpne loggfil: {e}")
             self._logg_fil = None
@@ -416,8 +424,10 @@ class PIDGUI(ttk.Frame):
 
         # Pakkeformat fra styrenode:
         # header(0xAA), tid(uint32), avstand_mm(uint16),
-        # e(int16), u(int16), up(int16), ui(int16), ud(int16), tail(0x55)
-        PAKKE = struct.Struct("<BIHhhhhhB")
+        # error(int32), output(int32), proportional(int32), integral(int32), derivative(int32), tail(0x55)
+        # Indeksene (bytes): 0:0xAA, 1-4:tid, 5-6:avstand, 7-10:error, 11-14:output, 15-18:proportional,
+        # 19-22:integral, 23-26:derivative, 27:0x55
+        PAKKE = struct.Struct("<BIHiiiiiB")
 
         while not self._lesetraads_stop.is_set() and sp.is_open:
             try:
@@ -435,7 +445,7 @@ class PIDGUI(ttk.Frame):
                 if tlr != 0x55:
                     continue
 
-                # Relativ tid i sekunder (antatt tid_raw i 10 ms ticks -> /100)
+                # Relativ tid i sekunder (tid mottatt med 10ms oppløsning)
                 if self._mcu_tid_start is None:
                     self._mcu_tid_start = tid_raw
                 delta = (tid_raw - self._mcu_tid_start) & 0xFFFFFFFF
@@ -452,13 +462,8 @@ class PIDGUI(ttk.Frame):
 
             except Exception as e_exc:
                 print(f"Lesefeil: {e_exc}")
-                try:
-                    if sp and sp.is_open:
-                        sp.close()
-                except Exception:
-                    pass
-                self.serieport = None
-                self.after(50, self._oppdater_status_from_port)
+                self.after(0, self._trygg_lukk_port)
+                self.after(200, self._oppdater_status_from_port)
                 break
 
     def _tøm_kø_og_oppdater(self):
@@ -469,7 +474,7 @@ class PIDGUI(ttk.Frame):
         except queue.Empty:
             pass
         self._oppdater_status_from_port()
-        self.after(50, self._tøm_kø_og_oppdater)
+        self.after(100, self._tøm_kø_og_oppdater)
 
     def lukk(self):
         self._stopp_logging()

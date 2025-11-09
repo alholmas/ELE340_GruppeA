@@ -8,11 +8,10 @@ def main():
     rot = tk.Tk()
     app = PIDGUI(rot)
     app.pack(fill=tk.BOTH, expand=True)
-    app.serieport = None  # initér eksplisitt
 
     # --- Tilkoblingshåndterere ---
-    def min_koble_til(portstreng):
-        # Lukk gammel port (viktig for å unngå lås)
+    def min_koble_til(portstreng: str):
+        # Lukk gammel port (greit ved port-bytte; PIDGUI sørger for lukking ved "Koble fra")
         sp_gammel = getattr(app, "serieport", None)
         if sp_gammel and sp_gammel.is_open:
             try:
@@ -23,7 +22,7 @@ def main():
         try:
             sp_ny = serial.Serial(port=portstreng, baudrate=115200, timeout=1)
         except Exception as e:
-            raise RuntimeError("Kunne ikke åpne {}: {}".format(portstreng, e))
+            raise RuntimeError("Kunne ikke åpne {}: {}".format(portstreng, e)) from e
 
         if not sp_ny.is_open:
             raise RuntimeError("Port {} ble ikke åpnet.".format(portstreng))
@@ -31,16 +30,6 @@ def main():
         app.serieport = sp_ny
         print("Status: tilkoblet {}".format(portstreng))
         return True
-
-    def min_koble_fra():
-        sp = getattr(app, "serieport", None)
-        if sp and sp.is_open:
-            try:
-                sp.close()
-            except Exception:
-                pass
-        app.serieport = None
-        print("Status: koblet fra")
 
     # PID-sender
     def min_pid_handler(settpunkt_mm, kp, ti, td, intbegr, start):
@@ -55,15 +44,17 @@ def main():
         try:
             pkt = struct.pack("<BBHHHHHB", HEADER, start, kp, ti, td, intbegr, settpunkt_mm, TAIL)
             sp.write(pkt)
-            print(f"Sendt pakke (len={len(pkt)}): "
+            print(
+                f"Sendt pakke (len={len(pkt)}): "
                 f"H=0x{HEADER:02X}, Start={start}, "
                 f"Kp={kp}, Ti={ti}, Td={td}, IntB={intbegr}, SP={settpunkt_mm}, "
-                f"Tail=0x{TAIL:02X}")
+                f"Tail=0x{TAIL:02X}"
+            )
         except Exception as e:
             messagebox.showerror("Sendefeil", f"Kunne ikke sende PID-verdier: {e}")
 
     # Registrer i GUI
-    app.registrer_tilkoblingshandler(min_koble_til, min_koble_fra)
+    app.registrer_tilkoblingshandler(min_koble_til)
     app.registrer_pid_callback(min_pid_handler)
 
     # Lukking
