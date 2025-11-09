@@ -8,7 +8,7 @@
 #include "usart.h"
 #include "dma.h"
 #include "pid.h"
-#include <sys/_intsup.h>
+
 
 /* RX buffer for DMA reception from sensor node (8-byte packets) */
 static uint8_t usart3_Rx_buf[8];
@@ -32,8 +32,6 @@ void StyreNode_Init(void)
   /* Oppstart av perifere enheter for sensorNode ----------------------*/
   (void)USART_StartRx_DMA(USART3, usart3_Rx_buf, sizeof(usart3_Rx_buf));
   (void)USART_StartRx_DMA(USART2, usart2_Rx_buf, sizeof(usart2_Rx_buf));
-  // TIM3_Start_PWM();
-  pid_init(&pid, 1, 1, 1, 1000, 5000);
 
 }
 
