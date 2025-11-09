@@ -1,7 +1,5 @@
 /* Includes ------------------------------------------------------------------*/
 #include "gpio.h"
-#include "main.h"
-#include "stm32f3xx_ll_gpio.h"
 
 
 void GPIO_Init(void)
