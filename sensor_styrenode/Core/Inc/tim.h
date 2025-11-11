@@ -15,8 +15,8 @@ void TIM7_Init(void);
 /* Metoder for TIM ------------------------------------------------------------*/
 void TIM3_Start_PWM(void);
 void TIM3_Stop_PWM(void);
-int TIM3_SetFrequencyHz(uint32_t freq_hz);
-int TIM3_SetFrequencyHzWithPrescaler(uint32_t freq_hz, uint32_t prescaler);
+// int TIM3_SetFrequencyHz(uint32_t freq_hz);
+void TIM_SetFreq_50pct(uint32_t freq_hz);
 
 void TIM4_Start_PWM(void);
 void TIM4_Stopp_PWM(void);

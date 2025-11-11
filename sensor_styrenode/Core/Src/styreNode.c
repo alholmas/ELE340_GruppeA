@@ -27,6 +27,7 @@ void StyreNode_Init(void)
 
   // LED 10 angir oppsart som styreNode
   LL_GPIO_SetOutputPin(LED10_GPIO_PORT, LED10_PIN);
+  
 
   
   /* Oppstart av perifere enheter for sensorNode ----------------------*/
@@ -70,18 +71,18 @@ void set_linmot_paadrag(pid_t *pid)
     if (paadrag > 0)
     {
       LL_GPIO_ResetOutputPin(DIR_GPIO_Port, DIR_Pin);
-      TIM3_SetFrequencyHz(paadrag);
+       TIM_SetFreq_50pct(paadrag);
     }
     else if (paadrag < 0)
     {
       paadrag = -paadrag;
       LL_GPIO_SetOutputPin(DIR_GPIO_Port, DIR_Pin);
-      TIM3_SetFrequencyHz(paadrag);
+       TIM_SetFreq_50pct(paadrag);
     }
   }
   else
   {
-    TIM3_SetFrequencyHz(0);
+     TIM_SetFreq_50pct(0);
   }
 }
 
@@ -122,7 +123,7 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
         case 0: // Stopp signal mottat fra GUI
           USART_Tx_Start_Stop(USART3, start_stop_byte);
           reset_pid(&pid);
-          TIM3_SetFrequencyHz(0);
+          // TIM3_SetFrequencyHz(0);
         break;
         case 1: // Start signal mottat fra GUI, settter PID verdier
           LL_GPIO_TogglePin(LED10_GPIO_PORT, LED10_PIN);
