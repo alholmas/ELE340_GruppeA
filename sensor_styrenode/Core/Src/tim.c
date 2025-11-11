@@ -15,9 +15,9 @@ void TIM3_Init(void)
   LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM3);
 
 
-  TIM_InitStruct.Prescaler = 143; /* 72 MHz / 720 = 100 kHz timer clock */
+  TIM_InitStruct.Prescaler = 0;
   TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
-  TIM_InitStruct.Autoreload = 1;
+  TIM_InitStruct.Autoreload = 0;
   TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
   LL_TIM_Init(TIM3, &TIM_InitStruct);
   LL_TIM_DisableARRPreload(TIM3);
@@ -27,7 +27,7 @@ void TIM3_Init(void)
   TIM_OC_InitStruct.OCState = LL_TIM_OCSTATE_ENABLE;
   TIM_OC_InitStruct.OCNState = LL_TIM_OCSTATE_DISABLE;
   
-  TIM_OC_InitStruct.CompareValue = 1; /* 50% duty cycle */
+  TIM_OC_InitStruct.CompareValue = 0;
   TIM_OC_InitStruct.OCPolarity = LL_TIM_OCPOLARITY_HIGH;
   
   // Buffer for ARR og CCR1 registers
@@ -65,79 +65,9 @@ void TIM3_Stop_PWM(void)
   LL_TIM_DisableCounter(TIM3);
 }
 
-// int TIM3_SetFrequencyHz(uint32_t freq_hz)
-// {
-
-//     if (freq_hz == 0) {
-//         return -1;
-//     }
-
-//     const uint32_t MAX_FREQ_HZ = 250000UL;
-//     if (freq_hz > MAX_FREQ_HZ) {
-//         freq_hz = MAX_FREQ_HZ; // clamp til maks
-//     }
-
-//     /* Beregn timerklokke for TIM3. Timerclock = PCLK1 * (APB1 prescale == 1 ? 1 : 2)
-//      * Vi bruker SystemCoreClock og RCC->CFGR for å finne APB1-prescaler.
-//      */
-//     uint32_t sysclk = SystemCoreClock;
-//     uint32_t ppre1 = (RCC->CFGR & RCC_CFGR_PPRE1) >> RCC_CFGR_PPRE1_Pos;
-//     uint32_t pclk1;
-//     if (ppre1 < 4) {
-//         /* 0xx => HCLK not divided */
-//         pclk1 = sysclk;
-//     } else {
-//         /* 100 => divide by 2, 101 => /4, 110 => /8, 111 => /16 */
-//         uint32_t div = 2U << (ppre1 - 4);
-//         pclk1 = sysclk / div;
-//     }
-//     /* Når APB prescaler != 1, timer klokker multipliseres med 2 på STM32 */
-//     uint32_t tim_clk = pclk1;
-//     if (ppre1 >= 4) {
-//         tim_clk = pclk1 * 2U;
-//     }
-
-//     /* Vi søker etter minste PSC (dvs. størst oppløsning) som gir ARR innen 16-bit */
-//     const uint32_t MAX_ARR = 0xFFFFU;
-//     uint32_t found_psc = 0xFFFFFFFFU;
-//     uint32_t found_arr = 0xFFFFFFFFU;
-
-//     for (uint32_t psc = 0; psc <= 0xFFFFU; ++psc) {
-//         /* arr+1 = tim_clk / (freq*(psc+1))  -> arr = (tim_clk/(freq*(psc+1))) - 1 */
-//         uint64_t denom = (uint64_t)freq_hz * (uint64_t)(psc + 1U);
-//         if (denom == 0) continue;
-//         uint64_t arr_plus1 = (uint64_t)tim_clk / denom;
-//         if (arr_plus1 == 0) continue; /* for høy frekvens / stor psc */
-//         uint64_t arr = arr_plus1 - 1ULL;
-//         if (arr <= MAX_ARR) {
-//             found_psc = psc;
-//             found_arr = (uint32_t)arr;
-//             break; /* første løsning gir lavest PSC */
-//         }
-//     }
-
-//     if (found_psc == 0xFFFFFFFFU) {
-//         /* Fant ingen gyldig kombinasjon */
-//         return -1;
-//     }
-
-//     /* Sett PSC/ARR/CCR for TIM3 kanal 1 (50% duty) */
-//     LL_TIM_DisableCounter(TIM3);
-//     LL_TIM_SetPrescaler(TIM3, found_psc);
-//     LL_TIM_SetAutoReload(TIM3, found_arr);
-//     uint32_t ccr = (found_arr + 1U) / 2U; /* 50% duty */
-//     LL_TIM_OC_SetCompareCH1(TIM3, ccr);
-
-//     /* Oppdater preload ved å generere update event */
-//     LL_TIM_GenerateEvent_UPDATE(TIM3);
-//     LL_TIM_EnableCounter(TIM3);
-
-//     return 0;
-// }
-
 static inline uint32_t uabsdiff(uint32_t a, uint32_t b){ return (a>b)?(a-b):(b-a); }
 
-void TIM_SetFreq_50pct(uint32_t freq_hz)
+void TIM3_SetFreq(uint32_t freq_hz)
 {
     const uint32_t timer_clk = 72000000UL; // 72 MHz
     const uint32_t ARR_MAX   = 0xFFFFUL;
@@ -237,6 +167,7 @@ void TIM7_Init(void)
 
 }
 
+// Start TIM7 TRGO 100 Hz
 void TIM7_Start_TRGO(void)
 {
   LL_TIM_EnableCounter(TIM7);

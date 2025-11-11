@@ -11,7 +11,7 @@ void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoi
 {
   
   pid->Kp = Kp;
-  pid->Ki = (Ti != 0) ? (Kp / Ti) : 0;;
+  pid->Ki = (Ti != 0) ? (Kp / Ti) : 0;
   pid->Kd = Kp * Td;
 
   pid->setpoint = setpoint;

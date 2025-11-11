@@ -41,48 +41,29 @@ void StyreNode_Loop(void)
 
 }
 /* SensorNode spesifikke funksjoner -------------------------------------*/
-// void set_linmot_paadrag(int32_t paadrag)
-// {
-//   if(paadrag > 0)
-//   {
-//     LL_GPIO_ResetOutputPin(DIR_GPIO_Port, DIR_Pin);
-
-//     TIM3_SetFrequencyHz((uint16_t)paadrag*100);
-//   }
-//   else if(paadrag < 0)
-//   {
-//     LL_GPIO_SetOutputPin(DIR_GPIO_Port, DIR_Pin);
-//     paadrag = -paadrag;
-//     TIM3_SetFrequencyHz((uint16_t)paadrag*100);
-//   }
-//   else if(paadrag == 0)
-//   {
-//     TIM3_SetFrequencyHz(0);
-//   }
-// }
 
 void set_linmot_paadrag(pid_t *pid)
 {
   if (!pid) return;
-  int32_t paadrag = pid->output;
+  int32_t paadrag_hz = pid->output;
   int32_t error = pid->error;
   if (error > 2 || error < -2)
   {
-    if (paadrag > 0)
+    if (paadrag_hz > 0)
     {
       LL_GPIO_ResetOutputPin(DIR_GPIO_Port, DIR_Pin);
-       TIM_SetFreq_50pct(paadrag);
+      TIM3_SetFreq(paadrag_hz);
     }
-    else if (paadrag < 0)
+    else if (paadrag_hz < 0)
     {
-      paadrag = -paadrag;
+      paadrag_hz = -paadrag_hz;
       LL_GPIO_SetOutputPin(DIR_GPIO_Port, DIR_Pin);
-       TIM_SetFreq_50pct(paadrag);
+      TIM3_SetFreq(paadrag_hz);
     }
   }
   else
   {
-     TIM_SetFreq_50pct(0);
+     TIM3_Stop_PWM();
   }
 }
 
