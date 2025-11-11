@@ -31,7 +31,7 @@ def main():
         return True
 
     # PID-sender
-    def min_pid_handler(settpunkt_mm, kp, ti, td, intbegr, start):
+    def min_pid_handler(settpunkt_mm, kp, ki, kd, intbegr, start):
         HEADER = 0xAA
         TAIL   = 0x55
 
@@ -42,12 +42,12 @@ def main():
 
         try:
             # Pakkeformat: HEADER(1) + start(1) + Kp(2) + Ti(2) + Td(2) + IntLimit(4) + SP(2) + TAIL(1) = 15 bytes
-            pkt = struct.pack("<BBHHHLHB", HEADER, start, kp, ti, td, intbegr, settpunkt_mm, TAIL)
+            pkt = struct.pack("<BBHHHLHB", HEADER, start, kp, ki, kd, intbegr, settpunkt_mm, TAIL)
             sp.write(pkt)
             print(
                 f"Sendt pakke (len={len(pkt)}): "
                 f"H=0x{HEADER:02X}, Start={start}, "
-                f"Kp={kp}, Ti={ti}, Td={td}, IntB={intbegr}, SP={settpunkt_mm}, "
+                f"Kp={kp}, Ti={ki}, Td={kd}, IntB={intbegr}, SP={settpunkt_mm}, "
                 f"Tail=0x{TAIL:02X}"
             )
         except Exception as e:
