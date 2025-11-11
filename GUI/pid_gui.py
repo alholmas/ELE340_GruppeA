@@ -279,12 +279,15 @@ class PIDGUI(ttk.Frame):
             messagebox.showwarning("Ugyldig verdi", "Alle verdier må være tall (kan ha desimaler).")
             return
             
-        # Konverter verdier direkte
+        # Verdier konvertert til int for sending
         sp_int = int(sp)
-        kp_int = int(kp * 1000)        # Konverterer til 1000 for å unngå float på uC
-        ti_int = int(ti)        # Konverterer til 1000 for å unngå float på uC
-        td_int = int(td)        # Konverterer til 1000 for å unngå float på uC
-        ib_int = int(ib * 1000)        # Konverterer til 1000 for å unngå float på uC
+        kp_int = int(kp * 1000)
+        if ti == 0:
+            ki_int = 0
+        else:
+            ki_int = int((kp / ti) * 1000)
+        kd_int = int(kp * td * 1000)
+        ib_int = int(ib * 1000)
         
         # Sett settpunkt til gjeldende hvis start eller oppdatering
         if int(start) in (1, 2):
@@ -293,7 +296,7 @@ class PIDGUI(ttk.Frame):
         try:
             if callable(self._pid_callback):
                 # Send de konverterte int-verdiene til callback
-                self._pid_callback(sp_int, kp_int, ti_int, td_int, ib_int, int(start))
+                self._pid_callback(sp_int, kp_int, ki_int, kd_int, ib_int, int(start))
             else:
                 messagebox.showinfo("Ingen handler", "Ingen PID-handler registrert.")
         except Exception as e:
@@ -318,10 +321,10 @@ class PIDGUI(ttk.Frame):
 
         # Mottatt data fra Styrenode
         self.err_data.append(int(e))
-        self.u_data.append(int(u)/1000)
-        self.up_data.append(int(up)/1000)
-        self.ui_data.append(int(ui)/1000)
-        self.ud_data.append(int(ud)/1000)
+        self.u_data.append(int(u)/1000)     # Skalerer ned for plott
+        self.up_data.append(int(up)/1000)   # Skalerer ned for plott
+        self.ui_data.append(int(ui)/1000)   # Skalerer ned for plott
+        self.ud_data.append(int(ud)/1000)   # Skalerer ned for plott
 
         self.info_lbl.config(text=f"Avstand: {int(pv)}")
         self._oppdater_plott()
