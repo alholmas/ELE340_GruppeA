@@ -1,4 +1,5 @@
 #include "adc.h"
+#include "stm32f303xc.h"
 
 
 void ADC3_Init(void)
@@ -62,7 +63,7 @@ void ADC3_Init(void)
   LL_ADC_SetChannelSingleDiff(ADC3, LL_ADC_CHANNEL_1, LL_ADC_SINGLE_ENDED);  
 }
 
-void Kalibrer_ADC3(void)
+void ADC3_Calibrate(void)
 {
   LL_ADC_StartCalibration(ADC3, LL_ADC_SINGLE_ENDED);
   while (LL_ADC_IsCalibrationOnGoing(ADC3)) {

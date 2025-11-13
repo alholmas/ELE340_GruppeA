@@ -11,6 +11,7 @@ extern "C" {
 void ADC3_Init(void);
 
 /* Metoder for ADC ------------------------------------------------------------*/
+void ADC3_Calibrate(void);
 void ADC3_StartConversion_TRGO(void);
 void ADC3_StopConversion_TRGO(void);
 

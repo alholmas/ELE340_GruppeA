@@ -7,12 +7,12 @@
 #define OUTPUT_LIMIT 250000
 
 
-void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoint, uint32_t integral_limit) 
+void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd, uint16_t setpoint, uint32_t integral_limit) 
 {
   
   pid->Kp = Kp;
-  pid->Ki = (Ti != 0) ? (Kp / Ti) : 0;
-  pid->Kd = Kp * Td;
+  pid->Ki = Ki;
+  pid->Kd = Kd;
 
   pid->setpoint = setpoint;
   pid->integral_limit = integral_limit;
@@ -39,11 +39,11 @@ void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoi
 }
 
 
-void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t setpoint, uint32_t integral_limit) 
+void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd, uint16_t setpoint, uint32_t integral_limit) 
 {
   pid->Kp = Kp;
-  pid->Ki = (Ti != 0) ? (Kp / Ti) : 0;
-  pid->Kd = Kp * Td;
+  pid->Ki = Ki;
+  pid->Kd = Kd;
 
   pid->setpoint = setpoint;
   pid->integral_limit = integral_limit;
