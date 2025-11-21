@@ -1,5 +1,5 @@
-#ifndef LOOKUP4_H
-#define LOOKUP4_H
+#ifndef LOOKUP_H
+#define LOOKUP_H
 
 #include <stdint.h>
 
@@ -196,4 +196,4 @@ static const uint16_t lookup[LOOKUP_LEN] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-#endif /* LOOKUP4_H */
+#endif /* LOOKUP_H */

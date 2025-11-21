@@ -196,4 +196,4 @@ static const uint16_t lookup[LOOKUP_LEN] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-#endif /* LOOKUP4_H */
+#endif /* LOOKUP_H */

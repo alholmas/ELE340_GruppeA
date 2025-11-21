@@ -5,10 +5,10 @@
 clear; clc; close all;
 
 % Mappe (ikke brukt her, men beholdes)
-plotmappe = fullfile(pwd, 'matlabplots');
+plotmappe = fullfile(pwd, 'plots');
 
 % Last inn måledata
-data = load('C:\Users\alexa\OneDrive\Dokumenter\GitHub\ELE340\GUI\ELE340_GruppeA-1\GUI\matlabplots\step10cm_med1kjøring_tid_avstand.csv');
+data = load('C:\Users\alexa\OneDrive\Dokumenter\GitHub\ELE340\GUI\ELE340_GruppeA-1\GUI\plots\step10cm_inn1.csv');
 
 tid     = data(:, 1);
 avstand = data(:, 2);
@@ -34,18 +34,14 @@ t_tau = 0.9;
 y_tau63 = 330;
 
 % Punktmarkør
-plot(t_tau, 337.5, 'ko', 'MarkerSize', 7, 'MarkerFaceColor', 'yellow');
+% plot(t_tau, 337.5, 'ko', 'MarkerSize', 7, 'MarkerFaceColor', 'yellow');
 
 % Stiplede hjelpelinjer
 %plot([t_tau t_tau], [min(avstand) max(avstand)], 'k--', 'LineWidth', 1);
 %plot([0 max(tid)], [y_tau63 y_tau63], 'k--', 'LineWidth', 1);
 
 % Label
-text(0.4, y_tau63 + 5, ...
-    '$T_c = 0.7 \mathrm{s}$', ...
-    'Interpreter', 'latex', ...
-    'BackgroundColor', 'white', ...
-    'FontSize', 15);
+
 
 % Vertikale linjer
 x1 = 0.2;
@@ -70,14 +66,14 @@ plot(x2, y_x2, 'ko', 'MarkerSize', 7, 'MarkerFaceColor', 'blue', 'LineWidth',1.2
 % (valgfritt) legg inn etiketter
 text(x1+0.03, y_x1-0.4, ...
     sprintf('$y_{m_1}$ = %i mm', y_x1), ...
-    'Interpreter','latex','FontSize',12, 'BackgroundColor','white');
+    'Interpreter','latex','FontSize',12 );
 
 text(x2+0.02, y_x2+3.5, sprintf('$y_{m_2}$ = %i mm', y_x2), ...
-    'Interpreter','latex','FontSize',12, 'BackgroundColor','white');
+    'Interpreter','latex','FontSize',12 );
 
 % Vertikal linje fra 63%-punktet og ned til kurven
-plot([t_tau t_tau], [y_tau63 337.5], 'k--', 'LineWidth', 1)
-plot([0.2 0.9], [y_tau63 y_tau63],'k', LineWidth=1.5)
+% plot([t_tau t_tau], [y_tau63 337.5], 'k--', 'LineWidth', 1)
+% plot([0.2 0.9], [y_tau63 y_tau63],'k', LineWidth=1.5)
 
 % --------------------------------------------------------------
 % Pil for prosesskonstant K
@@ -95,26 +91,28 @@ markerstorrelse = 7;
 skyv = 0.011;
 plot(0.1+skyv, y_tau63, 'k<', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
 plot(0.2-skyv, y_tau63, 'k>', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
-plot(0.2+skyv, y_tau63, 'k<', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
-plot(0.9-skyv, y_tau63, 'k>', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
+%plot(0.2+skyv, y_tau63, 'k<', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
+%plot(0.9-skyv, y_tau63, 'k>', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
 
 % Tekst over pila (K)
 text( ...
-     0.66,365, ...    
-    '$|K|=\frac{y_{m_2}-y_{m_1}}{\Delta u = 100}=0.96[s]$', ...
+     0.64,370, ...    
+    '$|K|=\frac{|\Delta y_m|}{\Delta t \cdot u}=0.96[\mu m]$', ...
     'Interpreter', 'latex', ...
     'BackgroundColor','white', ...
     'FontSize', 17);
 
 % Tekst for τ og Δt
-text(0.1, y_tau63+5, '$\tau=0.1\,\mathrm{s}$', ...
+text(0.2, y_tau63+5, '$\tau=0.1\,\mathrm{s}$', ...
     'BackgroundColor', 'white', ...
     'Interpreter', 'latex', 'FontSize',15);
 
-text(0.4, 323, '$\Delta t = 1\,\mathrm{s}$', ...
+text(0.4, y_tau63+5, '$\Delta t = 1\,\mathrm{s}$', ...
     'BackgroundColor', 'white', ...
     'Interpreter', 'latex', 'FontSize',15);
-
+plot([x1 x2], [y_tau63 y_tau63], 'k', 'LineWidth', 1.5);
+plot(x1+skyv, y_tau63, 'k<', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
+plot(x2-skyv, y_tau63, 'k>', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
 % --------------------------------------------------------------
 % Pådragsplata på høyre y-akse
 % --------------------------------------------------------------
@@ -126,9 +124,7 @@ yyaxis right   % bytt til høyre akse
 % Sett høyreaksens farge til blå (samme som pådraget)
 ax = gca;
 ax.YAxis(2).Color = [0 0.4 1];
-plot([x1 x2], [15 15], 'k', 'LineWidth', 1.5);
-plot(x1+skyv, 15, 'k<', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
-plot(x2-skyv, 15, 'k>', 'MarkerSize', markerstorrelse, 'MarkerFaceColor', 'k');
+
 % Lag pådragsignal
 dt = 0.001;
 tid_pad = 0:dt:1.5;
@@ -139,7 +135,7 @@ pad(tid_pad >= 0.1 & tid_pad < 1.1) = 100;   % 100 kHz plateau
 h_padrag = plot(tid_pad, pad, 'LineWidth', 1.5, ...
                 'Color', [0 0.4 1], 'LineStyle', '--');
 
-ylabel('Pådrag (kHz)[mm/s]');
+ylabel('Pådrag (kHz)');
 ylim([-10 120])   % litt luft rundt 0 og 100
 
 % --------------------------------------------------------------
