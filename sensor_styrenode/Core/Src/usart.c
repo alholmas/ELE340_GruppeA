@@ -348,10 +348,10 @@ void USART_Tx_Tid_Avstand_PidPaadrag(USART_TypeDef *USARTx, uint32_t tid, uint16
   dataBuffer[4] = (tid >> 24) & 0xFF;         
   dataBuffer[5] = mmAvstand & 0xFF;           
   dataBuffer[6] = (mmAvstand >> 8) & 0xFF;    
-  dataBuffer[7] = pid->error & 0xFF;                  
-  dataBuffer[8] = (pid->error >> 8) & 0xFF;
-  dataBuffer[9] = (pid->error >> 16) & 0xFF;
-  dataBuffer[10] = (pid->error >> 24) & 0xFF;
+  dataBuffer[7] = pid->err & 0xFF;                  
+  dataBuffer[8] = (pid->err >> 8) & 0xFF;
+  dataBuffer[9] = (pid->err >> 16) & 0xFF;
+  dataBuffer[10] = (pid->err >> 24) & 0xFF;
   dataBuffer[11] = (pid->output) & 0xFF;    
   dataBuffer[12] = (pid->output >> 8) & 0xFF;
   dataBuffer[13] = (pid->output >> 16) & 0xFF;

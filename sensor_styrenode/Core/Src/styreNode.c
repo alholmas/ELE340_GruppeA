@@ -46,7 +46,7 @@ void set_linmot_paadrag(pid_t *pid)
 {
   if (!pid) return;
   int32_t paadrag_hz = pid->output;
-  int32_t error = pid->error;
+  int32_t error = pid->err;
   if (error > 5 || error < -5)
   {
     if (paadrag_hz > 0)
@@ -90,14 +90,14 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
   }
   // Mottak fra GUI
   else if (USARTx == USART2) {
-    if (len >= 15 && buf[0] == 0xAA && buf[14] == 0x55) {
+    if (len >= 15 && buf[0] == 0xAA && buf[12] == 0x55) {
       uint8_t start_stop_byte = buf[1];
       /* Little-endian: LSB first for 16-bit fields */
       uint16_t Kp = (uint16_t)buf[2] | ((uint16_t)buf[3] << 8);
       uint16_t Ki = (uint16_t)buf[4] | ((uint16_t)buf[5] << 8);
       uint16_t Kd = (uint16_t)buf[6] | ((uint16_t)buf[7] << 8);
-      uint32_t integral_limit = (uint16_t)buf[8] | ((uint16_t)buf[9] << 8) | ((uint16_t)buf[10] << 16) | ((uint16_t)buf[11] << 24);
-      uint16_t setpoint = (uint16_t)buf[12] | ((uint16_t)buf[13] << 8);
+      uint32_t kaw = (uint16_t)buf[8] | ((uint16_t)buf[9] << 8);
+      uint16_t setpoint = (uint16_t)buf[10] | ((uint16_t)buf[11] << 8);
     
       
       switch (start_stop_byte) {
@@ -109,10 +109,10 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
         case 1: // Start signal mottat fra GUI, settter PID verdier
           LL_GPIO_TogglePin(LED10_GPIO_PORT, LED10_PIN);
           USART_Tx_Start_Stop(USART3, start_stop_byte);
-          pid_init(&pid, Kp, Ki, Kd, setpoint, integral_limit);
+          pid_init(&pid, Kp, Ki, Kd, setpoint, kaw);
         break;
         case 2: // Oppdater signal mottat fra GUI,setter KP, TI, TD, Setpoint og integral begrensing
-          update_pid_parameters(&pid, Kp, Ki, Kd, setpoint, integral_limit);
+          update_pid_parameters(&pid, Kp, Ki, Kd, setpoint, kaw);
           LL_GPIO_SetOutputPin(LED3_GPIO_PORT, LED3_PIN);
         break;
 
