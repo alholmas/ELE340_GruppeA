@@ -34,8 +34,8 @@ typedef struct {
 } pid_t;
 
 
-void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td, uint16_t kaw, uint16_t setpoint);
-void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ti, uint16_t Td,  uint16_t kaw, uint16_t setpoint);
+void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd, uint16_t kaw, uint16_t setpoint);
+void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd,  uint16_t kaw, uint16_t setpoint);
 void reset_pid(pid_t *pid);
 void compute_PID_Output(pid_t *pid, uint16_t measured_value);
 

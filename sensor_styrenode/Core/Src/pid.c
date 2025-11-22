@@ -112,7 +112,7 @@ void compute_PID_Output(pid_t *pid, uint16_t measured_value)
   if(pid->output > OUTPUT_LIMIT) pid->output = OUTPUT_LIMIT;
   if(pid->output < -OUTPUT_LIMIT) pid->output = -OUTPUT_LIMIT;
   
-  pid->anti_windup = (out_usat - pid->output) * pid->kaw;
+  pid->anti_windup = (pid->output - out_usat) * pid->kaw;
   pid->err_prev = pid->err;
   pid->integral_prev = pid->integral;
 }

@@ -23,9 +23,9 @@ class PIDGUI(ttk.Frame):
 
         # Tilstandsvariabler (konverteres fra streng til int for validering av tegn)
         self.settpunkt_var = tk.StringVar(value="500")
-        self.kp_var = tk.StringVar(value="10")
-        self.ki_var = tk.StringVar(value="0")     # Ti
-        self.intbegr_var = tk.StringVar(value="0")
+        self.kp_var = tk.StringVar(value="5.21")
+        self.ki_var = tk.StringVar(value="0.8")     # Ti
+        self.kaw_var = tk.StringVar(value="4")
         self.kd_var = tk.StringVar(value="0")  # Td
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
@@ -134,7 +134,7 @@ class PIDGUI(ttk.Frame):
         self._rad_med_entry(pidboks, "Settpunkt", self.settpunkt_var)
         self._rad_med_entry(pidboks, "Kp", self.kp_var)
         self._rad_med_entry(pidboks, "Ti", self.ki_var)
-        self._rad_med_entry(pidboks, "Integrator begrensning", self.intbegr_var)
+        self._rad_med_entry(pidboks, "Kaw", self.kaw_var)
         self._rad_med_entry(pidboks, "Td", self.kd_var)
 
         radkn = ttk.Frame(pidboks)
@@ -273,9 +273,9 @@ class PIDGUI(ttk.Frame):
         kp = self._parse_float(self.kp_var.get())
         ti = self._parse_float(self.ki_var.get())
         td = self._parse_float(self.kd_var.get())
-        ib = self._parse_float(self.intbegr_var.get())
+        kaw = self._parse_float(self.kaw_var.get())
         
-        if None in (sp, kp, ti, td, ib):
+        if None in (sp, kp, ti, td, kaw):
             messagebox.showwarning("Ugyldig verdi", "Alle verdier må være tall (kan ha desimaler).")
             return
             
@@ -287,7 +287,7 @@ class PIDGUI(ttk.Frame):
         else:
             ki_int = int((kp / ti) * 1000)
         kd_int = int(kp * td * 1000)
-        ib_int = int(ib * 1000)
+        kaw_int = int(kaw)
         
         # Sett settpunkt til gjeldende hvis start eller oppdatering
         if int(start) in (1, 2):
@@ -296,7 +296,7 @@ class PIDGUI(ttk.Frame):
         try:
             if callable(self._pid_callback):
                 # Send de konverterte int-verdiene til callback
-                self._pid_callback(sp_int, kp_int, ki_int, kd_int, ib_int, int(start))
+                self._pid_callback(sp_int, kp_int, ki_int, kd_int, kaw_int, int(start))
             else:
                 messagebox.showinfo("Ingen handler", "Ingen PID-handler registrert.")
         except Exception as e:

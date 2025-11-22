@@ -12,7 +12,7 @@
 
 /* RX buffer for DMA reception from sensor node (8-byte packets) */
 static uint8_t usart3_Rx_buf[8];
-static uint8_t usart2_Rx_buf[15];
+static uint8_t usart2_Rx_buf[13];
 static pid_t pid = {0};
 
 
@@ -90,7 +90,7 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
   }
   // Mottak fra GUI
   else if (USARTx == USART2) {
-    if (len >= 15 && buf[0] == 0xAA && buf[12] == 0x55) {
+    if (len >= 13 && buf[0] == 0xAA && buf[12] == 0x55) {
       uint8_t start_stop_byte = buf[1];
       /* Little-endian: LSB first for 16-bit fields */
       uint16_t Kp = (uint16_t)buf[2] | ((uint16_t)buf[3] << 8);
@@ -109,13 +109,12 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
         case 1: // Start signal mottat fra GUI, settter PID verdier
           LL_GPIO_TogglePin(LED10_GPIO_PORT, LED10_PIN);
           USART_Tx_Start_Stop(USART3, start_stop_byte);
-          pid_init(&pid, Kp, Ki, Kd, setpoint, kaw);
+          pid_init(&pid, Kp, Ki, Kd, kaw, setpoint);
         break;
         case 2: // Oppdater signal mottat fra GUI,setter KP, TI, TD, Setpoint og integral begrensing
-          update_pid_parameters(&pid, Kp, Ki, Kd, setpoint, kaw);
+          update_pid_parameters(&pid, Kp, Ki, Kd, kaw, setpoint);
           LL_GPIO_SetOutputPin(LED3_GPIO_PORT, LED3_PIN);
         break;
-
       }
       /* Restart DMA */
       (void)USART_StartRx_DMA(USART2, usart2_Rx_buf, sizeof(usart2_Rx_buf));
