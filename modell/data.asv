@@ -1,13 +1,12 @@
-Kp = 5.21;
-Ti = 0.65;
-Td = 0.01 ;
+Kp = 1;
+Ti = 0;
+Td = 0 ;
 K = 0.96;
 Tau = 0.1;
-kb=6;
-setpoint = 0;
+kb=0;
+setpoint = 100;
 avstand_t0 = 0;
 sat = 250;
-noise=0
 
 if Ti ~= 0
     Ki = Kp / Ti;
