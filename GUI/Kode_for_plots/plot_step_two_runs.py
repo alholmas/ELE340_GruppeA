@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plotter to kjøringer fra en CSV og lagrer som PDF i `fig/`.
 
-Bruk: python3 plot_step_two_runs.py <csvfile> [pdffile]
+Bruk: python3 plot_step_two_runs.py <csvfile> [pdffile] [--title "Tittel"]
 
 CSV ligger i `plots/` under skriptmappen. Første kolonne: tid, andre kolonne: avstand (mm).
 Skal finne to kjøringer (split når tid < forrige tid), merke den økende som "kjøring inn"
@@ -68,6 +68,7 @@ def main():
     parser = argparse.ArgumentParser(description="Plot two runs from CSV and save PDF to fig/")
     parser.add_argument("csvfile", help="CSV-filnavn i `plots/`")
     parser.add_argument("pdffile", nargs="?", default="step_inn_ut.pdf", help="Utdata PDF-navn (lagres i `fig/`)")
+    parser.add_argument("--title", "-t", dest="title", help="Tittel for plottet (valgfritt)")
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -101,15 +102,28 @@ def main():
         label2 = "kjøring inn" if slope2 < 0 else "kjøring ut"
         label1 = "kjøring ut" if label2 == "kjøring inn" else "kjøring inn"
 
+    # Begrens data til tidsvindu 0..1.4 s
+    tmin, tmax = 0.0, 1.4
+    mask1 = (x1 >= tmin) & (x1 <= tmax)
+    mask2 = (x2 >= tmin) & (x2 <= tmax)
+    if not mask1.any():
+        print("Advarsel: ingen datapunkter for første kjøring i 0..1.4 s", file=sys.stderr)
+    if not mask2.any():
+        print("Advarsel: ingen datapunkter for andre kjøring i 0..1.4 s", file=sys.stderr)
+    x1f, y1f = x1[mask1], y1[mask1]
+    x2f, y2f = x2[mask2], y2[mask2]
+
     # Plot
     plt.figure()
-    plt.plot(x1, y1, label=label1)
-    plt.plot(x2, y2, label=label2)
+    if args.title:
+        plt.title(args.title)
+    plt.plot(x1f, y1f, label=label1)
+    plt.plot(x2f, y2f, label=label2)
     plt.xlabel("Tid")
     plt.ylabel("Avstand (mm)")
     plt.legend()
     plt.grid(True)
-    plt.xlim(left=0)
+    plt.xlim(tmin, tmax)
 
     fig_dir = os.path.join(script_dir, "fig")
     os.makedirs(fig_dir, exist_ok=True)
