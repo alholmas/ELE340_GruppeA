@@ -46,8 +46,7 @@ void set_linmot_paadrag(pid_t *pid)
 {
   if (!pid) return;
   int32_t paadrag_hz = pid->output;
-  int32_t error = pid->err;
-  if (error > 5 || error < -5)
+  if (pid->err > (int32_t)pid->err_deadzone || pid->err < -(int32_t)pid->err_deadzone)
   {
     if (paadrag_hz > 0)
     {

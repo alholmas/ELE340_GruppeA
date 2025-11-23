@@ -10,7 +10,8 @@
 #define INVERSE_TIME_STEP 100
 #define OUTPUT_LIMIT 250000
 #define INTEGRAL_LIMIT 250000
-#define INTEGRAL_DEADZONE 5 
+
+
 
 void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd, uint16_t kaw, uint16_t setpoint)
 {
@@ -33,6 +34,11 @@ void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd, uint16_t kaw, u
 
   pid->output = 0;
   pid->anti_windup = 0;
+
+  int16_t deadzone = (int16_t)pid->setpoint / 100;
+  pid->err_deadzone = deadzone;
+
+
 }
 
 void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd, uint16_t kaw, uint16_t setpoint)
@@ -75,7 +81,7 @@ void compute_PID_Output(pid_t *pid, uint16_t measured_value)
   // Bergn I-delen kun visst ki er satt
   if (pid->Ki != 0) {
     // Stopper integrasjon ved litten feil, samme som pådragsfunksjon
-    if (pid->err > INTEGRAL_DEADZONE || pid->err < -INTEGRAL_DEADZONE) {
+    if (pid->err > (int32_t)pid->err_deadzone || pid->err < -(int32_t)pid->err_deadzone) {
       int32_t sum_err = pid->err + pid->err_prev;
       int32_t incr = 0;
       // Beregn inkrement med anti-windup kun visst kaw er satt

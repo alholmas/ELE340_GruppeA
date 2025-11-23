@@ -28,6 +28,7 @@ typedef struct {
 
   int32_t filt_measurement_prev; // Forrige filtered måling y_fm(k-1)
 
+  int16_t err_deadzone;       // Døsone for avvik
   int32_t output;             // Pid pådrag U(k)
   int32_t anti_windup;        // Anti-windup verdi AW(k)
 
