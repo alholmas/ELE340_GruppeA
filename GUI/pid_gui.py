@@ -22,17 +22,17 @@ class PIDGUI(ttk.Frame):
         self._sett_tema()
 
         # Tilstandsvariabler (konverteres fra streng til int for validering av tegn)
-        self.settpunkt_var = tk.StringVar(value="400")
+        self.settpunkt_var = tk.StringVar(value="350")
         self.kp_var = tk.StringVar(value="5.21")
         self.ki_var = tk.StringVar(value="0.8")     # Ti
         self.kaw_var = tk.StringVar(value="5")
-        self.kd_var = tk.StringVar(value="0")  # Td
+        self.kd_var = tk.StringVar(value="0.05")  # Td
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
         self.serieport = None  # serial.Serial eller None
 
         # Data-buffere for plott (PV/SP)
-        self.max_punkt = 6000
+        self.max_punkt = 2000
         self.t_data  = deque(maxlen=self.max_punkt)   # tid [s]
         self.pv_data = deque(maxlen=self.max_punkt)   # prosessverdi (avstand mm)
         self.sp_data = deque(maxlen=self.max_punkt)   # settpunkt
@@ -487,7 +487,7 @@ class PIDGUI(ttk.Frame):
         except queue.Empty:
             pass
         self._oppdater_status_from_port()
-         self.after(100, self._tøm_kø_og_oppdater)
+        self.after(100, self._tøm_kø_og_oppdater)
 
     def lukk(self):
         self._stopp_logging()
