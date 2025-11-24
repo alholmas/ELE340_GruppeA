@@ -41,13 +41,13 @@ def main():
             return
 
         try:
-            # Pakkeformat: HEADER(1) + start(1) + Kp(2) + Ti(2) + Td(2) + Kaw(2) + SP(2) + TAIL(1) = 13 bytes
+            # Pakkeformat: HEADER(1) + start(1) + Kp(2) + Ti(2) + Td(2) + Kb(2) + SP(2) + TAIL(1) = 13 bytes
             pkt = struct.pack("<BBHHHHHB", HEADER, start, kp, ki, kd, kaw, settpunkt_mm, TAIL)
             sp.write(pkt)
             print(
                 f"Sendt pakke (len={len(pkt)}): "
                 f"H=0x{HEADER:02X}, Start={start}, "
-                f"Kp={kp}, Ki={ki}, Kd={kd}, Kaw={kaw}, SP={settpunkt_mm}, "
+                f"Kp={kp}, Ki={ki}, Kd={kd}, Kb={kaw}, SP={settpunkt_mm}, "
                 f"Tail=0x{TAIL:02X}"
             )
         except Exception as e:

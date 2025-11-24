@@ -22,10 +22,10 @@ class PIDGUI(ttk.Frame):
         self._sett_tema()
 
         # Tilstandsvariabler (konverteres fra streng til int for validering av tegn)
-        self.settpunkt_var = tk.StringVar(value="500")
+        self.settpunkt_var = tk.StringVar(value="400")
         self.kp_var = tk.StringVar(value="5.21")
         self.ki_var = tk.StringVar(value="0.8")     # Ti
-        self.kaw_var = tk.StringVar(value="4")
+        self.kaw_var = tk.StringVar(value="5")
         self.kd_var = tk.StringVar(value="0")  # Td
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
@@ -134,7 +134,7 @@ class PIDGUI(ttk.Frame):
         self._rad_med_entry(pidboks, "Settpunkt", self.settpunkt_var)
         self._rad_med_entry(pidboks, "Kp", self.kp_var)
         self._rad_med_entry(pidboks, "Ti", self.ki_var)
-        self._rad_med_entry(pidboks, "Kaw", self.kaw_var)
+        self._rad_med_entry(pidboks, "Kb", self.kaw_var)
         self._rad_med_entry(pidboks, "Td", self.kd_var)
 
         radkn = ttk.Frame(pidboks)
@@ -403,7 +403,7 @@ class PIDGUI(ttk.Frame):
             filsti = os.path.join(plots_mappe, filnavn)
             self.filnavn_var.set(filsti)  # Oppdater filnavn-variabel med full sti
             self._logg_fil = open(filsti, "a", buffering=1, encoding="utf-8")
-            # Vis relativ sti for brukeren
+            # Vis relativ sti
             self.logg_lbl.config(text=f"Loggnavn: {os.path.join('plots', filnavn)}")
             # self._logg_fil.write("tid_s,pv,sp,e,u,up,ui,ud\n") Header
         except Exception as e:
@@ -487,7 +487,7 @@ class PIDGUI(ttk.Frame):
         except queue.Empty:
             pass
         self._oppdater_status_from_port()
-        self.after(100, self._tøm_kø_og_oppdater)
+         self.after(100, self._tøm_kø_og_oppdater)
 
     def lukk(self):
         self._stopp_logging()
