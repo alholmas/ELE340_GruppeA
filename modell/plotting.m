@@ -132,18 +132,3 @@ ax.YAxis(1).Color = [0 0 0];
 ax.XAxis.Color    = [0 0 0];
 hold on
 
-% %save('uawu','t','y','r','u')
-% load('uawu')
-% awu = plot(t, y, LineWidth=1, Color='k', LineStyle='--')
-% awy = plot(t, u, 'LineWidth', 1, 'Color', 'r',         'LineStyle','--'); % rød
-% 
-% idx_after_step = idx_sprang;
-% [y_max, idx_rel] = max(y(idx_after_step:end));
-% idx_ymax = idx_rel + idx_after_step - 1;
-% 
-% oversving_pct = (y_max - r_slutt) / abs(delta_r) * 100;
-% text(t(idx_ymax), y(idx_ymax) + 0.05*yl_span, ...
-%     sprintf('$M_p = %.1f\\,\\%%$', oversving_pct), ...
-%     'HorizontalAlignment','center','VerticalAlignment','bottom');
-% legend([pl_r, pl_y, pl_u,awu,awy], {'$R(t)$','$y_{awu}(t)$','$u_{awu}(t)$','$y(t)$','$u(t)$'}, 'Location','best');
-% hold off;
