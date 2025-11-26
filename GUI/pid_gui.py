@@ -21,18 +21,18 @@ class PIDGUI(ttk.Frame):
         # Tema
         self._sett_tema()
 
-        # Tilstandsvariabler (konverteres fra streng til int for validering av tegn)
-        self.settpunkt_var = tk.StringVar(value="350")
+        # Tilstandsvariabler   bruker string->int konvertering ved bruk for å unngå feil
+        self.settpunkt_var = tk.StringVar(value="400")
         self.kp_var = tk.StringVar(value="5.21")
         self.ki_var = tk.StringVar(value="0.8")     # Ti
         self.kaw_var = tk.StringVar(value="5")
-        self.kd_var = tk.StringVar(value="0.05")  # Td
+        self.kd_var = tk.StringVar(value="0")  # Td
         self.port_var = tk.StringVar(value="")
         self.filnavn_var = tk.StringVar(value="logg.txt")
-        self.serieport = None  # serial.Serial eller None
+        self.serieport = None
 
         # Data-buffere for plott (PV/SP)
-        self.max_punkt = 2000
+        self.max_punkt = 1000
         self.t_data  = deque(maxlen=self.max_punkt)   # tid [s]
         self.pv_data = deque(maxlen=self.max_punkt)   # prosessverdi (avstand mm)
         self.sp_data = deque(maxlen=self.max_punkt)   # settpunkt
@@ -437,9 +437,8 @@ class PIDGUI(ttk.Frame):
 
         # Pakkeformat fra styrenode:
         # header(0xAA), tid(uint32), avstand_mm(uint16),
-        # error(int32), output(int32), proportional(int32), integral(int32), derivative(int32), tail(0x55)
-        # Indeksene (bytes): 0:0xAA, 1-4:tid, 5-6:avstand, 7-10:error, 11-14:output, 15-18:proportional,
-        # 19-22:integral, 23-26:derivative, 27:0x55
+        # error(int32), u(int32), up(int32), ui(int32), ud(int32), tail(0x55)
+        # Indeksene (bytes): 0:0xAA, 1-4:tid, 5-6:avstand, 7-10:error, 11-14:u, 15-18:up, 19-22:ui, 23-26:ud, 27:0x55
         PAKKE = struct.Struct("<BIHiiiiiB")
 
         while not self._lesetraads_stop.is_set() and sp.is_open:
