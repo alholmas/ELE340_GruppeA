@@ -33,10 +33,6 @@ volatile uint8_t sensorNode = 0; // Variabel for å bestemme om modulen er senso
 int main(void)
 {
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-
-
-
-
   LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SYSCFG);
   LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
   
@@ -50,8 +46,8 @@ int main(void)
   DMA_Init();
   GPIO_Init();
   
-  // Sjekker om sensorNode_Enable_PIN er høy for å bestemme modus
-  if (LL_GPIO_IsInputPinSet(sensorNode_Enable_GPIO_Port, sensorNode_Enable_PIN))
+  // Sjekker om system_velger_PIN er høy for å bestemme modus, sensornode høy, styrenode lav
+  if (LL_GPIO_IsInputPinSet(system_velger_GPIO_Port, system_velger_PIN))
   {
     // Sensor Node spesifikk init
     SensorNode_Init();

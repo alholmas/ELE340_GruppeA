@@ -11,6 +11,9 @@ void GPIO_Init(void);
 
 /* Metoder for GPIO -----------------------------------------------------------*/
 
+/* Callbacks ------------------------------------------------------------------*/
+void USER_BUTTON_Callback(void);
+void SW1_Callback(void);
 
 #ifdef __cplusplus
 }

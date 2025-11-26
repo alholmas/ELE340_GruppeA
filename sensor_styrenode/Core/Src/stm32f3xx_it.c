@@ -28,6 +28,7 @@
 /* Include peripheral drivers -------------------------------------------------*/
 #include "adc.h"
 #include "usart.h"
+#include "gpio.h"
 #include "dma.h"
 
 
@@ -165,7 +166,7 @@ void SysTick_Handler(void)
 
 void ADC3_IRQHandler(void) 
 {
-  //Sjekker End of conversion (EOC) flagg data available in ADC DR register.
+  // Sjekker End of conversion (EOC) flagg. Data tilgjenglig i ADC DR register.
   if (LL_ADC_IsActiveFlag_EOC(ADC3)) {
     ADC3_EndOfConversion_Callback();      
   }
@@ -174,11 +175,11 @@ void ADC3_IRQHandler(void)
 
 void USART2_IRQHandler(void)
 {
-  /* TXE: transmit data register empty - feed next byte */
+  // TXE: trasmit data register tomt - fyll neste byte
   if (LL_USART_IsActiveFlag_TXE(USART2)) {
     USART_TXE_Handler(USART2);
   }
-  /* TC: transmission complete - end of frame */
+  // TC: transmit complete  
   if (LL_USART_IsActiveFlag_TC(USART2)) {
     USART_TC_Handler(USART2);
   }
@@ -186,19 +187,19 @@ void USART2_IRQHandler(void)
 
 void USART3_IRQHandler(void)
 {
- /* TXE: transmit data register empty - feed next byte */
+  // TXE: trasmit data register tomt - fyll neste byte
   if (LL_USART_IsActiveFlag_TXE(USART3)) {
     USART_TXE_Handler(USART3);
   }
 
-  /* TC: transmission complete - end of frame */
+  // TC: transmit complete  
   if (LL_USART_IsActiveFlag_TC(USART3)) {
     USART_TC_Handler(USART3);
   }
 }
 
 
-/* DMA channel IRQ handlers are implemented in Core/Src/dma.c (to centralize DMA handling). */
+/* DMA channel IRQ handlers */
 void DMA1_Channel3_IRQHandler(void)
 {
   /* Notify USART DMA handler for channel 3 (USART3 RX in this project) */
@@ -211,6 +212,28 @@ void DMA1_Channel6_IRQHandler(void)
   /* Notify USART DMA handler for channel 6 (USART2 RX in this project) */
   USART_DMA_Channel6_Handler();
 }
+// User button EXTI interrupt handler
+void EXTI0_IRQHandler(void)
+{
+  if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_0) != RESET)
+  {
+    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_0);
+    USER_BUTTON_Callback();
+  }
+}
+
+
+// SW1 EXTI interrupt handler
+void EXTI4_IRQHandler(void)
+{
+  if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_4) != RESET)
+  {
+    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_4);
+    SW1_Callback();
+  }
+}
+
+
 
 
 

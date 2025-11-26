@@ -5,6 +5,7 @@
 #include "stm32f3xx_ll_tim.h"
 #include <stdint.h>
 
+// Auto generert av cubeMX
 void TIM3_Init(void)
 {
   LL_TIM_InitTypeDef TIM_InitStruct = {0};
@@ -73,7 +74,7 @@ void TIM3_SetFreq(uint32_t freq_hz)
     const uint32_t ARR_MAX   = 0xFFFFUL;
     const uint32_t ARR_MIN   = 1UL;        // (ARR+1) >= 2
 
-    // Spesialtilfelle: "0 Hz" -> slå utgangen konstant av (eller på), ikke PWM
+    // skru av
     if (freq_hz == 0) {
         TIM3->CR1  &= ~TIM_CR1_CEN;      // stopp
         return;
@@ -116,7 +117,6 @@ void TIM3_SetFreq(uint32_t freq_hz)
 
 void TIM4_Init(void)
 {  
-
   // Enable clock for TIM4
   LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM4);
 
@@ -150,7 +150,7 @@ void TIM4_Stopp_PWM(void)
   LL_TIM_DisableCounter(TIM4);
 }
 
-
+// Auto generert av cubeMX
 void TIM7_Init(void)
 {
   LL_TIM_InitTypeDef TIM_InitStruct = {0};
@@ -173,6 +173,7 @@ void TIM7_Start_TRGO(void)
   LL_TIM_EnableCounter(TIM7);
 }
 
+// Stopp TIM7 TRGO
 void TIM7_Stopp_TRGO(void)
 {
   LL_TIM_DisableCounter(TIM7);
