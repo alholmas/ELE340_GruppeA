@@ -15,21 +15,13 @@
 #include "pid.h"
 #include "lookup.h"
 
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-/* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
+/* Variabler ----------------------------------------------------------------*/
 static volatile uint32_t tid = 0;
-static volatile uint32_t adc_mV = 0;
+static volatile uint16_t adc_mV = 0;
 static volatile uint16_t avstand_mm = 0;
 static volatile uint8_t start_sending_flag = 0;
-// static volatile uint8_t test_flag = 0;
 static uint8_t usart3_SensorNode_Rx_buf[3];
 
-/* Private function prototypes -----------------------------------------------*/
-
-
-/* Private functions ---------------------------------------------------------*/
 
 void SensorNode_Init(void)
 {
@@ -40,23 +32,17 @@ void SensorNode_Init(void)
   TIM7_Init();
   USART3_Init();
 
-
   // LED 3 angir oppsett som sensorNode
   LL_GPIO_SetOutputPin(LED3_GPIO_PORT, LED3_PIN);
-  // Kalibrering av ADC3
-
 
   /* Oppstart av perifere enheter for sensorNode ----------------------*/
-  // Start av PWM 4000 Hz for sette knekkfrekvens(40 HZ) filter.
-  // TIM4_Start_PWM(); 
-  // ADC3_Calibrate();
-  // // Start ADC conversion TRGO tim7.
-  // ADC3_StartConversion_TRGO();
-  // TIM7_Start_TRGO();
+  TIM4_Start_PWM(); // Start av PWM 4000 Hz for sette knekkfrekvens(40 HZ) filter.
+  ADC3_Calibrate(); // Kalibrering av ADC3
+  // Start ADC conversion TRGO tim7.
+  ADC3_StartConversion_TRGO(); TIM7_Start_TRGO();
 
-
-  // Start USART3 dma recive
-  (void)USART_StartRx_DMA(USART3, usart3_SensorNode_Rx_buf, sizeof(usart3_SensorNode_Rx_buf));
+  /* Start USART3 DMA receive */
+  USART_StartRx_DMA(USART3, usart3_SensorNode_Rx_buf, sizeof(usart3_SensorNode_Rx_buf));
   
 }
 
@@ -64,7 +50,6 @@ void SensorNode_Loop(void)
 {
   
 }
-
 
 /* SensorNode spesifikke metoder ----------------------------------------*/
 
@@ -79,9 +64,10 @@ uint16_t konverter_mV(uint16_t adc_val)
 /* Interrupt Callback --------------------------------------------------- */
 void ADC3_EndOfConversion_Callback(void)
 {
-  uint32_t bit_value = LL_ADC_REG_ReadConversionData12(ADC3);
+  // Konverter ADC verdi til mV og deretter til mm avstand(lookup)
+  uint16_t bit_value = LL_ADC_REG_ReadConversionData12(ADC3);
   adc_mV = (bit_value * 3000) / 4096;
-  avstand_mm = lookup[(uint16_t)adc_mV];
+  avstand_mm = lookup[(adc_mV)];
   LL_ADC_ClearFlag_EOC(ADC3);
 
   // Send data Til styreNode
@@ -90,37 +76,21 @@ void ADC3_EndOfConversion_Callback(void)
   tid++;
 }
 
-
-
 void USART_RxDMAComplete_Callback_SensorNode(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
 {
-  
-  if (len >= 3 && buf[0] == 0xAA && buf[2] == 0x55)
+  if (len >= 3 && buf[0] == 0xAA && buf[2] == 0x55)  // Skjekker gyldig start/stop pakke
   {
     uint8_t start_stop_byte = buf[1];
-    if (start_stop_byte == 0x01)
+    if (start_stop_byte == 0x01) // Start
     { 
-      
-      start_sending_flag = 1;
-      // Start av PWM 4000 Hz for sette knekkfrekvens(40 HZ) filter.
-      TIM4_Start_PWM(); 
-      // Start ADC conversion TRGO tim7.
-      ADC3_StartConversion_TRGO();
-      TIM7_Start_TRGO();
-      
+      start_sending_flag = 1;      
     }
-    else if (start_stop_byte == 0x00)
+    else if (start_stop_byte == 0x00) // Stopp
     {
-      // Stopp
       start_sending_flag = 0;
-      ADC3_StopConversion_TRGO();
-      TIM7_Stopp_TRGO();
-      TIM4_Stopp_PWM();
       tid = 0;
     }
   }
-  // Start ny recive USART
-  (void)USART_StartRx_DMA(USART3, usart3_SensorNode_Rx_buf, sizeof(usart3_SensorNode_Rx_buf));
-
-
+  /* Start ny receive USART3 DMA */
+  USART_StartRx_DMA(USART3, usart3_SensorNode_Rx_buf, sizeof(usart3_SensorNode_Rx_buf));
 }

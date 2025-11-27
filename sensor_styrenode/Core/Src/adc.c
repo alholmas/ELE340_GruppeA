@@ -1,7 +1,7 @@
 #include "adc.h"
 #include "stm32f303xc.h"
 
-
+// Auto generert av cubemx
 void ADC3_Init(void)
 {  
   LL_ADC_InitTypeDef ADC_InitStruct = {0};
@@ -67,27 +67,22 @@ void ADC3_Calibrate(void)
 {
   LL_ADC_StartCalibration(ADC3, LL_ADC_SINGLE_ENDED);
   while (LL_ADC_IsCalibrationOnGoing(ADC3)) {
-    /* wait calibration */
+    /* vent på kalibrering */
   }
 }
 
-
-// Start ADC conversion, TIM7 må startes separat.
+// Start ADC konvertering, TIM7 må startes separat.
 void ADC3_StartConversion_TRGO(void)
 { 
-  // Clear EOC flag
-  LL_ADC_ClearFlag_EOC(ADC3);
-  // // Enable end of conversion interrupt
-  LL_ADC_EnableIT_EOC(ADC3);
-  // Enable ADC
+  LL_ADC_ClearFlag_EOC(ADC3); // Clear end of conversion flag
+  LL_ADC_EnableIT_EOC(ADC3); // Enable end of conversion interrupt
   LL_ADC_Enable(ADC3);
   while (!LL_ADC_IsActiveFlag_ADRDY(ADC3)) {
-    /* wait ADC ready */
+    /* vent til ADC er klar */
   }
-  // Start konvertering
-  LL_ADC_REG_StartConversion(ADC3);
+  LL_ADC_REG_StartConversion(ADC3); // Start konvertering
 }
-
+// Stopp ADC konvertering, TIM7 må stoppes separat.
 void ADC3_StopConversion_TRGO(void)
 {
   LL_ADC_REG_StopConversion(ADC3);
@@ -98,5 +93,5 @@ void ADC3_StopConversion_TRGO(void)
 // Callback function for end of conversion for bruk i andre moduler
 void __attribute__((weak)) ADC3_EndOfConversion_Callback(void)
 {
-  // Tom default-implementasjon; kan overstyres ved å definere samme funksjon uten __weak i en annen .c-fil
+  /* Tom default-implementasjon; kan overstyres ved å definere samme funksjon uten __weak i en annen .c-fil */
 }

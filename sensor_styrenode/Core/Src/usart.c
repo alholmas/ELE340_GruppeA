@@ -1,14 +1,13 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
 #include "pid.h"
-#include "stm32f303xc.h"
 #include "stm32f3xx_ll_usart.h"
-#include <stdint.h>
-#include <string.h>
+#include <stddef.h>
 
 
 extern volatile uint16_t sensorNode;
 
+// Auto generert av cubeMX
 void USART2_Init(void)
 {
   LL_USART_InitTypeDef USART_InitStruct = {0};
@@ -62,8 +61,9 @@ void USART2_Init(void)
   LL_USART_ConfigAsyncMode(USART2);
   LL_USART_Enable(USART2);
 }
-/* USART3 init function */
 
+
+// Auto generert av cubeMX
 void USART3_Init(void)
 {
   LL_USART_InitTypeDef USART_InitStruct = {0};
@@ -121,22 +121,18 @@ void USART3_Init(void)
 }
 
 
-/* ------------------------------------------------------------------
-   Interrupt-driven, buffered transmit implementation
-   Uses TXE interrupt to feed bytes and TC interrupt to detect end
-   of transmission so caller (e.g. ADC EOC ISR) won't block.
-   Supports USART2 and USART3 instances used in this project.
-   ------------------------------------------------------------------ */
+/* RX via DMA-tilstand */
+static usart_rx_dma_t rx_usart2 = {0};
+static usart_rx_dma_t rx_usart3 = {0};
 
-#define USART_TX_BUF_SIZE 256
+static usart_rx_dma_t* usart_get_rx(USART_TypeDef *USARTx)
+{
+  if (USARTx == USART2) return &rx_usart2;
+  if (USARTx == USART3) return &rx_usart3;
+  return NULL;
+}
 
-typedef struct {
-  volatile uint8_t busy;
-  uint8_t buf[USART_TX_BUF_SIZE];
-  uint16_t len;
-  volatile uint16_t idx;
-} usart_tx_t;
-
+/* TX via interrupt-tilstand */
 static usart_tx_t tx_usart2 = {0};
 static usart_tx_t tx_usart3 = {0};
 
@@ -147,55 +143,33 @@ static usart_tx_t* usart_get_tx(USART_TypeDef *USARTx)
   return NULL;
 }
 
-/* RX via DMA state */
-typedef struct {
-  uint8_t *buf;
-  uint16_t len;
-  volatile uint8_t active;
-} usart_rx_dma_t;
-
-static usart_rx_dma_t rx_usart2 = {0};
-static usart_rx_dma_t rx_usart3 = {0};
-
-/* Helper to get RX state by USART instance */
-static usart_rx_dma_t* usart_get_rx(USART_TypeDef *USARTx)
+// Start DMA-basert RX
+void USART_StartRx_DMA(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
 {
-  if (USARTx == USART2) return &rx_usart2;
-  if (USARTx == USART3) return &rx_usart3;
-  return NULL;
-}
-
-/* Start DMA-based RX. Uses DMA1 channels configured elsewhere (MX_DMA_Init).
- * For this project mapping is:
- *  - USART3 RX -> DMA1 Channel 3
- *  - USART2 RX -> DMA1 Channel 6
- * Caller provides a buffer that DMA will write into.
- */
-int USART_StartRx_DMA(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
-{
-  if (buffer == NULL || length == 0) return -1;
+  if (buffer == NULL || length == 0) return;
 
   DMA_TypeDef *DMAx = DMA1;
   uint32_t channel = 0;
   usart_rx_dma_t *rx = usart_get_rx(USARTx);
-  if (rx == NULL) return -1;
+  if (rx == NULL) return;
 
   if (USARTx == USART3) {
     channel = LL_DMA_CHANNEL_3;
   } else if (USARTx == USART2) {
     channel = LL_DMA_CHANNEL_6;
   } else {
-    return -1;
+    return;
   }
 
-  /* Check channel not active */
+  /* Sjekk at kanalen ikke er aktiv */
   if (LL_DMA_IsEnabledChannel(DMAx, channel)) {
-    return -2; /* busy */
+    return; /* opptatt */
   }
 
-  /* Program peripheral and memory addresses and length */
-  /* Peripheral address: USART RDR (data register for RX). */
-  /* Clear any pending flags for this channel (safe to call) and enable TC/TE interrupts */
+  /* Programmer periferi- og minneadresser og lengde */
+  /* Periferadresse: USART RDR (dataregister for RX). */
+  /* Rydd eventuelle ventende flagg for denne kanalen (trygt å kalle)
+   * og aktiver TC/TE-avbrudd */
   if (channel == LL_DMA_CHANNEL_3) {
     LL_DMA_ClearFlag_TC3(DMA1);   
     LL_DMA_ClearFlag_TE3(DMA1);
@@ -212,23 +186,17 @@ int USART_StartRx_DMA(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
   LL_DMA_SetMemoryAddress(DMAx, channel, (uint32_t)buffer);
   LL_DMA_SetDataLength(DMAx, channel, length);
 
-  /* Enable USART DMA request for RX and enable DMA channel */
+  /* Aktiver USART DMA-forespørsel for RX og slå på DMA-kanalen */
   LL_USART_EnableDMAReq_RX(USARTx);
   LL_DMA_EnableChannel(DMAx, channel);
 
-  /* store state so IRQ can reference buffer if needed */
+  /* Lagre tilstand slik at IRQ kan referere til bufferen om nødvendig */
   rx->buf = buffer;
   rx->len = length;
   rx->active = 1;
-
-  return 0;
 }
 
-
-/* Called by DMA IRQ handler in dma.c when a transfer completes for a USART.
- * This function retrieves the internal buffer pointer/length and calls the
- * user-overridable callback `USART_RxDMAComplete_Callback` with that info.
- */
+// Kalles av DMA IRQ-handler i dma.c når en overføring er fullført for en USART.
 void USART_HandleDMA_RxComplete(USART_TypeDef *USARTx)
 {
   usart_rx_dma_t *rx = usart_get_rx(USARTx);
@@ -248,23 +216,25 @@ void USART_HandleDMA_RxComplete(USART_TypeDef *USARTx)
   }
 }
 
-int USART_Tx_Buffer_IT(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
+
+void USART_Tx_Buffer_IT(USART_TypeDef *USARTx, uint8_t *buffer, uint16_t length)
 {
-  if (buffer == NULL || length == 0) return -1;
+  if (buffer == NULL || length == 0) return;
   usart_tx_t *tx = usart_get_tx(USARTx);
-  if (tx == NULL) return -1;
-  if (length > USART_TX_BUF_SIZE) return -3;
-  if (tx->busy) return -2;
+  if (tx == NULL) return;
+  if (length > USART_TX_BUF_SIZE) return;
+  if (tx->busy) return;
 
   /* Copy into internal buffer so caller can reuse/stack can pop */
-  memcpy(tx->buf, buffer, length);
+  for (uint16_t i = 0; i < length; ++i) {
+    tx->buf[i] = buffer[i];
+  }
   tx->len = length;
   tx->idx = 0;
   tx->busy = 1;
 
   /* Enable TXE interrupt to start transmission (will fire when TXE=1) */
   LL_USART_EnableIT_TXE(USARTx);
-  return 0;
 }
 
 // USART transmit register empty handler
@@ -273,16 +243,16 @@ void USART_TXE_Handler(USART_TypeDef *USARTx)
   usart_tx_t *tx = usart_get_tx(USARTx);
   if (tx == NULL) return;
 
-  /* If there are bytes to send, write next byte. */
+  /* Hvis det er bytes å sende, skriv neste byte. */
   if (tx->idx < tx->len) {
     LL_USART_TransmitData8(USARTx, tx->buf[tx->idx++]);
-    /* If we've just written the last byte, stop TXE interrupts and enable TC */
+    /* Hvis vi nettopp skrev siste byte: stopp TXE-avbrudd og aktiver TC */
     if (tx->idx >= tx->len) {
       LL_USART_DisableIT_TXE(USARTx);
       LL_USART_EnableIT_TC(USARTx);
     }
   } else {
-    /* Nothing left: disable TXE and enable TC just in case */
+    /* Ingenting igjen: deaktiver TXE og aktiver TC for sikkerhets skyld */
     LL_USART_DisableIT_TXE(USARTx);
     LL_USART_EnableIT_TC(USARTx);
   }
@@ -294,24 +264,17 @@ void USART_TC_Handler(USART_TypeDef *USARTx)
   usart_tx_t *tx = usart_get_tx(USARTx);
   if (tx == NULL) return;
 
-  /* Clear TC flag and mark not busy */
+  /* Fjern TC-flagget */
   if (LL_USART_IsActiveFlag_TC(USARTx)) {
     LL_USART_ClearFlag_TC(USARTx);
+    LL_USART_DisableIT_TC(USARTx);
   }
   tx->busy = 0;
   tx->len = 0;
   tx->idx = 0;
 }
 
-// // USART transmit 1byte
-// void USART_Tx(USART_TypeDef *USARTx, uint8_t Value)
-// {
-//   while(!LL_USART_IsActiveFlag_TXE(USARTx))
-//   {
-//     LL_USART_TransmitData8(USARTx, Value);
-//   }
-// }
-
+/* USART Transmit funksjoner */
 void USART_Tx_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte)
 {
   uint8_t dataBuffer[3];
@@ -319,7 +282,7 @@ void USART_Tx_Start_Stop(USART_TypeDef *USARTx, uint8_t start_stop_byte)
   dataBuffer[1] = start_stop_byte;            // Start/Stop byte
   dataBuffer[2] = 0x55;                       // Footer endbyte
 
-  (void)USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+  USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
 void USART_Tx_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand)
@@ -335,13 +298,13 @@ void USART_Tx_Tid_Avstand(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstan
   dataBuffer[7] = 0x55;                     // Footer endbyte
 
 
-  (void)USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+  USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
 
 void USART_Tx_Tid_Avstand_PidPaadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, pid_t *pid)
 {
   uint8_t dataBuffer[28];
-  dataBuffer[0] = 0xAA;                       // Header startbyte
+  dataBuffer[0] = 0xAA;                      // Header startbyte
   dataBuffer[1] = tid & 0xFF;                // Least significant byte av tid (little-endian)
   dataBuffer[2] = (tid >> 8) & 0xFF;
   dataBuffer[3] = (tid >> 16) & 0xFF;
@@ -370,10 +333,8 @@ void USART_Tx_Tid_Avstand_PidPaadrag(USART_TypeDef *USARTx, uint32_t tid, uint16
   dataBuffer[26] = (pid->derivative >> 24) & 0xFF;
   dataBuffer[27] = 0x55;                       // Footer endbyte
 
-  (void)USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+  USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
-
-
 
 void USART_Tx_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t mmAvstand, uint16_t error, uint64_t U)
 {
@@ -397,18 +358,17 @@ void USART_Tx_Tid_Avstand_Paadrag(USART_TypeDef *USARTx, uint32_t tid, uint16_t 
   dataBuffer[16] = (U >> 56) & 0xFF;          // Most significant byte av U
   dataBuffer[17] = 0x55;                       // Footer endbyte
 
-  (void)USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
+  USART_Tx_Buffer_IT(USARTx, dataBuffer, sizeof(dataBuffer));
 }
-
 
 void __attribute__((weak)) USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
 {
-  /* Default empty implementation; override in application to process received buffer */
+  /* Tom default-implementasjon; kan overstyres ved å definere samme funksjon uten __weak i en annen .c-fil */
   (void)USARTx; (void)buf; (void)len;
 }
 
 void __attribute__((weak)) USART_RxDMAComplete_Callback_SensorNode(USART_TypeDef *USARTx, uint8_t *buf, uint16_t len)
 {
-  /* Default empty implementation; override in application to process received buffer */
+  /* Tom default-implementasjon; kan overstyres ved å definere samme funksjon uten __weak i en annen .c-fil */
   (void)USARTx; (void)buf; (void)len;
 }

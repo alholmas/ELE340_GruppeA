@@ -2,10 +2,9 @@
 #include "dma.h"
 #include "usart.h"
 
-
+// Auto generert av cubeMX
 void DMA_Init(void)
 {
-
   /* Init with LL driver */
   /* DMA controller clock enable */
   LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMA1);

@@ -14,7 +14,7 @@ typedef struct {
   int32_t Ki; // Integral forsterkning
   int32_t Kd; // Derivasjons forsterkning
 
-  int32_t kaw; // Anti-windup forsterkning
+  int32_t kb; // Anti-windup forsterkning
 
   int32_t setpoint;       // Refranse/setpunkt y_r(k)
   
@@ -28,19 +28,22 @@ typedef struct {
 
   int32_t filt_measurement_prev; // Forrige filtered måling y_fm(k-1)
 
-  int16_t err_deadzone;       // Døsone for avvik
+  uint16_t err_deadzone;       // Døsone for avvik
   int32_t output;             // Pid pådrag U(k)
   int32_t anti_windup;        // Anti-windup verdi AW(k)
 
 } pid_t;
 
-
-void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd, uint16_t kaw, uint16_t setpoint);
-void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd,  uint16_t kaw, uint16_t setpoint);
-void reset_pid(pid_t *pid);
+void pid_default_init(pid_t *pid);
+void pid_init(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd, uint16_t kb, uint16_t setpoint);
+void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd,  uint16_t kb, uint16_t setpoint);
 void compute_PID_Output(pid_t *pid, uint16_t measured_value);
 
+void reset_pid(pid_t *pid);
 
+
+void pid_deactivate_deadzone(pid_t *pid);
+void pid_activate_deadzone(pid_t *pid);
 
 
 #ifdef __cplusplus

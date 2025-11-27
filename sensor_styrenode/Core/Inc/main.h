@@ -57,8 +57,6 @@ void SystemClock_Config(void);
 
 /* ==============   BOARD SPECIFIC CONFIGURATION CODE BEGIN    ============== */
 
-
-
 /**
   * @brief LED3
   */
@@ -116,18 +114,11 @@ void SystemClock_Config(void);
 #define LED10_GPIO_CLK_ENABLE()             LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOE)
 
 /**
-  * @brief SW1
-  */
-#define SW1_Pin                             LL_GPIO_PIN_4
-#define SW1_GPIO_Port                       GPIOF
-#define SW1_GPIO_CLK_ENABLE()               LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA)
-
-/**
   * @brief sensorNode_Enable_PIN PB11
   */
-#define sensorNode_Enable_PIN                LL_GPIO_PIN_11
-#define sensorNode_Enable_GPIO_Port          GPIOB
-#define sensorNode_Enable_GPIO_CLK_ENABLE()  LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB)
+#define system_velger_PIN                LL_GPIO_PIN_11
+#define system_velger_GPIO_Port          GPIOB
+#define system_velger_GPIO_CLK_ENABLE()  LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB)
 
 /**
   * @brief DIR Pin PB5
@@ -151,6 +142,23 @@ void SystemClock_Config(void);
                                                   LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE0);  \
                                                 } while(0)
 #define USER_BUTTON_IRQHANDLER                 EXTI0_IRQHandler
+
+
+/**
+  * @brief SW1
+  */
+#define SW1_PIN                                LL_GPIO_PIN_4
+#define SW1_GPIO_PORT                          GPIOF
+#define SW1_GPIO_CLK_ENABLE()                  LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOF)
+#define SW1_EXTI_LINE                          LL_EXTI_LINE_4  
+#define SW1_EXTI_IRQn                          EXTI4_IRQn
+#define SW1_EXTI_LINE_ENABLE()                 LL_EXTI_EnableIT_0_31(SW1_EXTI_LINE)
+#define SW1_EXTI_FALLING_TRIG_ENABLE()         LL_EXTI_EnableRisingTrig_0_31(SW1_EXTI_LINE)
+#define SW1_SYSCFG_SET_EXTI()                  do {                                                                    \
+                                                  LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SYSCFG);                 \
+                                                  LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTF, LL_SYSCFG_EXTI_LINE4); \
+                                                } while(0)
+#define SW1_IRQHANDLER                         EXTI4_IRQHandler
 
 
 #ifndef NVIC_PRIORITYGROUP_0
