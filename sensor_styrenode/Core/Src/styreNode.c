@@ -102,6 +102,7 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
           USART_Tx_Start_Stop(USART3, start_stop_byte);
           reset_pid(&pid);
           TIM3_Stop_PWM();
+          LL_GPIO_ResetOutputPin(LED7_GPIO_PORT, LED7_PIN);
           system_aktivt = 0;
         break;
         case 1: // Start signal mottat fra GUI, settter PID verdier
@@ -109,7 +110,7 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
           pid_init(&pid, Kp, Ki, Kd, kb, setpoint);
           if (!system_aktivt) {
             system_aktivt = 1;
-            LL_GPIO_TogglePin(LED10_GPIO_PORT, LED10_PIN);
+            LL_GPIO_SetOutputPin(LED7_GPIO_PORT, LED7_PIN);
           }
         break;
         case 2: // Oppdater signal mottat fra GUI,setter KP, TI, TD, Setpoint og integral begrensing
