@@ -397,14 +397,13 @@ class PIDGUI(ttk.Frame):
             # Generer automatisk filnavn med dato og tid
             naa = datetime.datetime.now()
             filnavn = f"logg_{naa.strftime('%Y%m%d_%H%M%S')}.txt"
-            # Sørg for at plots-mappen finnes og lagre fil der
+            # Sørg for at plots-mappen finnes
             plots_mappe = os.path.join(os.getcwd(), "plots")
             os.makedirs(plots_mappe, exist_ok=True)
             filsti = os.path.join(plots_mappe, filnavn)
-            self.filnavn_var.set(filsti)  # Oppdater filnavn-variabel med full sti
+            self.filnavn_var.set(filsti)
             self._logg_fil = open(filsti, "a", buffering=1, encoding="utf-8")
-            # Vis relativ sti
-            self.logg_lbl.config(text=f"Loggnavn: {os.path.join('plots', filnavn)}")
+            self.logg_lbl.config(text=f"Loggnavn: {os.path.join('plots', filnavn)}") # Vis relativ sti
             # self._logg_fil.write("tid_s,pv,sp,e,u,up,ui,ud\n") Header
         except Exception as e:
             messagebox.showerror("Loggfil-feil", f"Kunne ikke åpne loggfil: {e}")
