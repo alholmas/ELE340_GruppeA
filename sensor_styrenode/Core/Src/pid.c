@@ -55,7 +55,7 @@ void update_pid_parameters(pid_t *pid, uint16_t Kp, uint16_t Ki, uint16_t Kd, ui
 
 void pid_default_init(pid_t *pid)
 {
-  pid_init(pid, 5210, 6512, 0, 5, 300);
+  pid_init(pid, 5210, 0, 0, 0, 300);
 }
 
 
@@ -87,13 +87,16 @@ void reset_pid(pid_t *pid)
 
 void compute_PID_Output(pid_t *pid, uint16_t measured_value)
 { 
-  // Beregn error
+  // Beregner avvik
   pid->err = pid->setpoint - (int32_t)measured_value;
 
-  // Bergn P-delen
+  // Beregner P-delen
   pid->proportional = pid->Kp * pid->err;
+  // Setter proporsjonal begrensing for unngå at P-delen blir med i back-calculation
+  if(pid->proportional > OUTPUT_LIMIT) pid->proportional = OUTPUT_LIMIT;
+  if(pid->proportional < -OUTPUT_LIMIT) pid->proportional = -OUTPUT_LIMIT;
 
-  // Bergn I-delen kun visst ki er satt
+  // Beregner I-delen kun visst ki er satt
   if (pid->Ki != 0 && (pid->err > (int32_t)pid->err_deadzone || pid->err < -(int32_t)pid->err_deadzone)) {
       int32_t sum_err = pid->err + pid->err_prev;
       int32_t incr = (pid->Ki * sum_err) / (2LL * (int32_t)INVERSE_TIME_STEP);
@@ -102,31 +105,30 @@ void compute_PID_Output(pid_t *pid, uint16_t measured_value)
   else {
     pid->integral = pid->integral_prev;
   }
-  // Setter integral begrensning
-  
-  if (pid->integral > INTEGRAL_LIMIT) pid->integral = INTEGRAL_LIMIT;
-  if (pid->integral < -INTEGRAL_LIMIT) pid->integral = -INTEGRAL_LIMIT;
-  
-  // Bergn D-delen kun visst kd er satt
+  // Setter integral begrensning kun visst vi ikke bruker back-calculation
+  if(pid->kb == 0) {
+    if (pid->integral > INTEGRAL_LIMIT) pid->integral = INTEGRAL_LIMIT;
+    if (pid->integral < -INTEGRAL_LIMIT) pid->integral = -INTEGRAL_LIMIT;
+  }
+
+  // Beregner D-delen kun visst kd er satt
   int32_t filt_meas = (int32_t)((964LL * (int32_t)pid->filt_measurement_prev + 60LL * (int32_t)measured_value) / 1024LL);
   int32_t delta_filt = filt_meas - pid->filt_measurement_prev;
   if(pid->Kd != 0) {
     pid->derivative = - (pid->Kd * (int32_t)INVERSE_TIME_STEP * delta_filt );
   }
-  // Total output
+  // Total pådrag
   int32_t unsat = pid->proportional + pid->integral + pid->derivative;
   int32_t sat = unsat;
-  // Outgangsbegrensning
+  // Utgangsbegrensning
   if(sat > OUTPUT_LIMIT) sat = OUTPUT_LIMIT;
   if(sat < -OUTPUT_LIMIT) sat = -OUTPUT_LIMIT;
-  // Back-calculation for anti-windup
+  // Back-calculation
   if (sat != unsat) {
     if(pid->kb != 0) { 
       int32_t diff = sat - unsat;
       int32_t correction = (diff * pid->kb) / (int32_t)INVERSE_TIME_STEP;
       pid->integral += correction;
-      if (pid->integral > INTEGRAL_LIMIT) pid->integral = INTEGRAL_LIMIT;
-      if (pid->integral < -INTEGRAL_LIMIT) pid->integral = -INTEGRAL_LIMIT;
     }
   }
 

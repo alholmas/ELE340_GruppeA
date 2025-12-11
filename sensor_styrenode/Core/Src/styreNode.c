@@ -39,7 +39,7 @@ void StyreNode_Init(void)
 
 void StyreNode_Loop(void)
 {
-
+  
 }
 /* SensorNode spesifikke funksjoner -------------------------------------*/
 void set_linmot_paadrag(pid_t *pid)
@@ -95,7 +95,6 @@ void USART_RxDMAComplete_Callback_StyreNode(USART_TypeDef *USARTx, uint8_t *buf,
       uint16_t Kd = (uint16_t)buf[6] | ((uint16_t)buf[7] << 8);
       uint32_t kb = (uint16_t)buf[8] | ((uint16_t)buf[9] << 8);
       uint16_t setpoint = (uint16_t)buf[10] | ((uint16_t)buf[11] << 8);
-    
       
       switch (start_stop_byte) {
         case 0: // Stopp signal mottat fra GUI

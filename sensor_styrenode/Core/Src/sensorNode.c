@@ -83,12 +83,20 @@ void USART_RxDMAComplete_Callback_SensorNode(USART_TypeDef *USARTx, uint8_t *buf
     uint8_t start_stop_byte = buf[1];
     if (start_stop_byte == 0x01) // Start
     { 
-      start_sending_flag = 1;      
+      start_sending_flag = 1; 
+      TIM4_Start_PWM(); // Start av PWM 4000 Hz for sette knekkfrekvens(40 HZ) filter.
+      ADC3_Calibrate(); // Kalibrering av ADC3
+      // Start ADC conversion TRGO tim7.
+      ADC3_StartConversion_TRGO(); TIM7_Start_TRGO();
+      LL_GPIO_SetOutputPin(LED7_GPIO_PORT, LED7_PIN);    
     }
     else if (start_stop_byte == 0x00) // Stopp
     {
       start_sending_flag = 0;
+      TIM4_Stopp_PWM(); // Stopp av PWM 4000 Hz for sette knekkfrekvens(40 HZ) filter.
+      ADC3_StopConversion_TRGO(); TIM7_Stopp_TRGO();
       tid = 0;
+      LL_GPIO_ResetOutputPin(LED7_GPIO_PORT, LED7_PIN);
     }
   }
   /* Start ny receive USART3 DMA */
